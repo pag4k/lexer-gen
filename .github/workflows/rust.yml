@@ -17,3 +17,16 @@ jobs:
       run: cargo build --verbose
     - name: Run tests
       run: cargo test --verbose
+    - name: Codecov
+      uses: codecov/codecov-action@v1.0.6
+      with:
+        # User defined upload name. Visible in Codecov UI
+        # name: # optional
+        # Repository upload token - get it from codecov.io. Required only for private repositories
+        # token: # optional
+        # Path to coverage file to upload
+        file: ./coverage.xml
+        # Flag upload to group coverage metrics (e.g. unittests | integration | ui,chrome)
+        #f lags: # optional
+        # Specify whether or not CI build should fail if Codecov runs into an error during upload
+        fail_ci_if_error: true

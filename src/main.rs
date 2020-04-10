@@ -3,5 +3,7 @@ mod finite_automaton;
 mod regular_expression;
 
 fn main() {
+    let Regex = regular_expression::regex(vec!['a', 'b']);
+
     println!("Hello, world!");
 }

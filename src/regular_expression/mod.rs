@@ -1,11 +1,6 @@
 extern crate alloc;
 
-use alloc::string::String;
 use alloc::vec::Vec;
-use core::iter::FromIterator;
-use core::str;
-
-pub type Regex = Vec<char>;
 
 const CONCAT_CHAR: char = '⋅';
 const NOT_AFTER: [char; 2] = ['(', '|'];
@@ -18,20 +13,22 @@ const PARENTHESIS: [char; 2] = ['(', ')'];
 // TODO: Need some function to check validity.
 // TODO: Change + to *.
 
-pub fn Regex(string: &str) -> Regex {
-    to_postfix(&add_explicit_concat(&Vec::from_iter(string.chars())))
+pub fn regex<T: AsRef<[char]>>(input: T) -> Vec<char> {
+    to_postfix(&add_explicit_concat(&replace_range(&Vec::from(
+        input.as_ref(),
+    ))))
 }
 
-pub fn replace_range(string: &str) -> String {
-    let mut new_string = String::from(string);
-    while let Some(left_position) = new_string.find('[') {
-        if let Some(right_position) = new_string.find(']') {
+fn replace_range<T: AsRef<[char]>>(input: T) -> Vec<char> {
+    let mut output = Vec::from(input.as_ref());
+    while let Some(left_position) = output.iter().position(|&c| c == '[') {
+        if let Some(right_position) = output.iter().position(|&c| c == ']') {
             //assert!((right_position - left_position) % 3 == 0);
             let mut position = left_position + 1;
             let mut chars = Vec::new();
             while position < right_position {
-                let start_char = new_string.chars().nth(position).unwrap();
-                let end_char = new_string.chars().nth(position + 2).unwrap();
+                let start_char = *output.get(position).unwrap();
+                let end_char = *output.get(position + 2).unwrap();
                 let mut new_chars = if (start_char.is_numeric() && end_char.is_numeric())
                     || (start_char.is_lowercase() && end_char.is_lowercase())
                     || (start_char.is_uppercase() && end_char.is_uppercase())
@@ -53,21 +50,22 @@ pub fn replace_range(string: &str) -> String {
             }
             substring.pop();
             substring.push(')');
-            new_string = new_string.replace(
-                new_string.get(left_position..=right_position).unwrap(),
-                &String::from_iter(substring),
-            );
+            output.splice(left_position..=right_position, substring.into_iter());
+        //output = output.replace(
+        //    output.get(left_position..=right_position).unwrap(),
+        //    &String::from_iter(substring),
+        //);
         } else {
             //panic!("ERROR: Brackets should some in pairs.");
         }
     }
-    new_string
+    output
 }
 
-pub fn add_explicit_concat(regex: &Regex) -> Regex {
-    let mut new_regex: Regex = Vec::new();
+fn add_explicit_concat<T: AsRef<[char]>>(input: T) -> Vec<char> {
+    let mut new_regex: Vec<char> = Vec::new();
 
-    for (i, c) in regex.iter().enumerate() {
+    for (i, c) in input.as_ref().iter().enumerate() {
         new_regex.push(*c);
 
         // Skip if current char is in NOT_AFTER.
@@ -76,7 +74,7 @@ pub fn add_explicit_concat(regex: &Regex) -> Regex {
         }
         // Get next char and skip if it is in NOT BEFORE.
         // If not, add the CONCAT_CHAR.
-        if let Some(next_c) = regex.get(i + 1) {
+        if let Some(next_c) = input.as_ref().get(i + 1) {
             if NOT_BEFORE.contains(next_c) {
                 continue;
             }
@@ -103,11 +101,11 @@ fn greater_precedence(first: char, second: char) -> bool {
     false
 }
 
-fn to_postfix(regex: &Regex) -> Regex {
-    let mut new_regex: Regex = Vec::new();
+fn to_postfix<T: AsRef<[char]>>(input: T) -> Vec<char> {
+    let mut new_regex: Vec<char> = Vec::new();
     let mut operator_stack: Vec<char> = Vec::new();
 
-    for c in regex {
+    for c in input.as_ref() {
         if OPERATORS.contains(c) {
             while !operator_stack.is_empty()
                 && *operator_stack.last().unwrap() != '('
@@ -144,15 +142,39 @@ mod tests {
 
     #[test]
     fn add_concat() {
-        let regex1: Regex = add_explicit_concat(&vec!['(', 'a', '|', 'b', ')', '*', 'c']);
-        let regex2: Regex = vec!['(', 'a', '|', 'b', ')', '*', CONCAT_CHAR, 'c'];
+        let regex1 = add_explicit_concat(&vec!['(', 'a', '|', 'b', ')', '*', 'c']);
+        let regex2 = vec!['(', 'a', '|', 'b', ')', '*', CONCAT_CHAR, 'c'];
         //assert!(equal(&regex1, &regex2));
         //assert_eq!(regex1, regex2);
     }
 
     #[test]
+    fn replace_range_letters() {
+        let range: Vec<char> = "[a-e]".chars().collect();
+        let replaced_range = replace_range(range);
+        assert_eq!(replaced_range, "(a|b|c|d|e)".chars().collect::<Vec<char>>());
+    }
+
+    #[test]
+    fn replace_range_letters_reverse() {
+        let range: Vec<char> = "[e-a]".chars().collect();
+        let replaced_range = replace_range(range);
+        assert_ne!(replaced_range, "(a|b|c|d|e)".chars().collect::<Vec<char>>());
+    }
+
+    #[test]
+    fn replace_range_numbers() {
+        let range: Vec<char> = "[4-9]".chars().collect();
+        let replaced_range = replace_range(range);
+        assert_eq!(
+            replaced_range,
+            "(4|5|6|7|8|9)".chars().collect::<Vec<char>>()
+        );
+    }
+
+    #[test]
     fn both() {
-        let regex1: Regex = to_postfix(&add_explicit_concat(&vec![
+        let regex1 = to_postfix(&add_explicit_concat(&vec![
             '(', 'a', '|', 'b', ')', '*', 'c',
         ]));
         let regex2 = vec!['a', 'b', '|', '*', 'c', CONCAT_CHAR];

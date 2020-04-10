@@ -4,7 +4,7 @@ use alloc::collections::btree_map::BTreeMap;
 use alloc::collections::btree_set::BTreeSet;
 use alloc::vec::Vec;
 
-use crate::regular_expression::Regex;
+//use crate::regular_expression::Regex;
 
 // The NFA defined here is limited since it assumes it will be created using
 // Thompson's construction.regular_expression.
@@ -35,7 +35,7 @@ pub struct NFA {
 }
 
 impl NFA {
-    pub fn from_regex(regex_list: &[Regex]) -> NFA {
+    pub fn from_regex(regex_list: &[Vec<char>]) -> NFA {
         // For NFA.
         let mut alphabet = BTreeSet::new();
         let mut function: BTreeMap<(usize, Option<char>), BTreeSet<usize>> = BTreeMap::new();

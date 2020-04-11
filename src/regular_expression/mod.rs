@@ -101,6 +101,7 @@ fn greater_precedence(first: char, second: char) -> bool {
     false
 }
 
+// This function assumes that there are explicit concat?
 fn to_postfix<T: AsRef<[char]>>(input: T) -> Vec<char> {
     let mut new_regex: Vec<char> = Vec::new();
     let mut operator_stack: Vec<char> = Vec::new();
@@ -173,12 +174,18 @@ mod tests {
     }
 
     #[test]
+    fn postfix() {
+        let before: Vec<char> = "(a|b)*⋅c".chars().collect();
+        let after: Vec<char> = "ab|*c⋅".chars().collect();
+        assert_eq!(to_postfix(before), after);
+    }
+
+    #[test]
     fn both() {
         let regex1 = to_postfix(&add_explicit_concat(&vec![
             '(', 'a', '|', 'b', ')', '*', 'c',
         ]));
         let regex2 = vec!['a', 'b', '|', '*', 'c', CONCAT_CHAR];
-        //assert!(equal(&regex1, &regex2));
-        //assert_eq!(regex1, regex2);
+        assert_eq!(regex1, regex2);
     }
 }

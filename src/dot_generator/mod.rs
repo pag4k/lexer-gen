@@ -1,9 +1,8 @@
 //use crate::finite_accepters::*;
-
+/*
 use core::str;
 
 extern crate alloc;
-
 use alloc::vec::Vec;
 
 /// DotGraph ADT
@@ -166,3 +165,4 @@ impl DotGraph {
         self.code.push(b'\n');
     }
 }
+*/

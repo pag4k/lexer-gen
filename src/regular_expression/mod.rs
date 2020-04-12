@@ -15,11 +15,6 @@ const PARENTHESIS: [char; 2] = ['(', ')'];
 // TODO: Need some function to check validity.
 // TODO: Change + to *.
 
-pub enum Error {
-    //Range values reversed. Start char code is greater than end char code.
-    RangeValuesReversed([char; 3]),
-}
-
 pub fn regex<T: AsRef<[char]>>(input: T) -> Vec<char> {
     to_postfix(&add_explicit_concat(&replace_classes(&Vec::from(
         input.as_ref(),
@@ -30,12 +25,10 @@ fn replace_classes<T: AsRef<[char]>>(input: T) -> Vec<char> {
     let mut output = Vec::from(input.as_ref());
     while let Some(left_position) = output.iter().position(|&c| c == '[') {
         if let Some(right_position) = output.iter().position(|&c| c == ']') {
-            //assert!((right_position - left_position) % 3 == 0);
+            let mut class: CharacterClass = Default::default();
             let mut position = left_position + 1;
             let negated = output[position] == '^';
             position += if negated { 1 } else { 0 };
-            // TODO: Maybe remove duplicate with a set?
-            let mut chars = Vec::new();
             while position < right_position {
                 println!("Char {}", output[position]);
                 if position + 2 < right_position && output[position + 1] == '-' {
@@ -45,10 +38,10 @@ fn replace_classes<T: AsRef<[char]>>(input: T) -> Vec<char> {
                     if (end_char as u8) < (start_char as u8) {
                         // FIXME: Find a better way to propagate this error.
                         println!("ERROR '{}-{}': Range values reversed. Start char code is greater than end char code.", start_char, end_char);
-                        chars.push(end_char);
+                        class.add(end_char);
                         continue;
                     }
-                    let mut new_chars = if (start_char.is_numeric() && end_char.is_numeric())
+                    let new_chars: Vec<char> = if (start_char.is_numeric() && end_char.is_numeric())
                         || (start_char.is_lowercase() && end_char.is_lowercase())
                         || (start_char.is_uppercase() && end_char.is_uppercase())
                     {
@@ -64,17 +57,17 @@ fn replace_classes<T: AsRef<[char]>>(input: T) -> Vec<char> {
                         );
                         continue;
                     };
-                    chars.append(&mut new_chars);
+                    class.add_slice(&new_chars);
                 } else {
                     //                    assert_eq!(output[position], '-');
-                    chars.push(output[position]);
+                    class.add(output[position]);
                     position += 1;
                 }
             }
             let mut substring: Vec<char> = Vec::new();
-            if !chars.is_empty() {
+            if !class.is_empty() {
                 substring.push('(');
-                for c in chars {
+                for c in class.to_array() {
                     substring.push(c);
                     substring.push('|');
                 }
@@ -233,7 +226,7 @@ mod tests {
         let replaced_range = replace_classes(range);
         assert_eq!(
             replaced_range,
-            "(c|d|e|8|a|4|5|Z)".chars().collect::<Vec<char>>()
+            "(4|5|8|Z|a|c|d|e)".chars().collect::<Vec<char>>()
         );
     }
 }

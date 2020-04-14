@@ -14,6 +14,7 @@ const PARENTHESIS: [char; 2] = ['(', ')'];
 
 // TODO: Need some function to check validity.
 // TODO: Change + to *.
+// TODO: Replace ?.
 
 pub fn regex<T: AsRef<[char]>>(input: T) -> Vec<char> {
     to_postfix(&add_explicit_concat(&replace_classes(&Vec::from(
@@ -34,39 +35,44 @@ fn replace_classes<T: AsRef<[char]>>(input: T) -> Vec<char> {
                 if position + 2 < right_position && output[position + 1] == '-' {
                     let start_char = output[position];
                     let end_char = output[position + 2];
-                    position += 3;
                     if (end_char as u8) < (start_char as u8) {
                         // FIXME: Find a better way to propagate this error.
                         println!("ERROR '{}-{}': Range values reversed. Start char code is greater than end char code.", start_char, end_char);
+                        // TODO: Not sure if I just want to take the last char.
                         class.add(end_char);
-                        continue;
-                    }
-                    let new_chars: Vec<char> = if (start_char.is_numeric() && end_char.is_numeric())
+                    } else if (start_char.is_numeric() && end_char.is_numeric())
                         || (start_char.is_lowercase() && end_char.is_lowercase())
                         || (start_char.is_uppercase() && end_char.is_uppercase())
                     {
-                        //assert!(start_char as usize <= end_char as usize);
-                        ((start_char as u8)..=(end_char as u8))
+                        let chars: Vec<char> = ((start_char as u8)..=(end_char as u8))
                             .map(|char| char as char)
-                            .collect()
+                            .collect();
+                        class.add_slice(&chars);
                     } else {
                         // FIXME: Not sure if I want this to be an error.
                         println!(
                             "ERROR '{}-{}': Characters of different type..",
                             start_char, end_char
                         );
-                        continue;
                     };
-                    class.add_slice(&new_chars);
+                    position += 3;
                 } else {
-                    //                    assert_eq!(output[position], '-');
                     class.add(output[position]);
                     position += 1;
                 }
             }
             let mut substring: Vec<char> = Vec::new();
+            if negated {
+                class.negate()
+            };
             if !class.is_empty() {
                 substring.push('(');
+                //let zip: Vec<char> = class
+                //    .to_array()
+                //   .into_iter()
+                //  .zip(['|'].into_iter().cycle().copied())
+                // .flatten()
+                //.collect();
                 for c in class.to_array() {
                     substring.push(c);
                     substring.push('|');
@@ -108,6 +114,44 @@ fn add_explicit_concat<T: AsRef<[char]>>(input: T) -> Vec<char> {
 
     new_regex
 }
+
+/*
+fn replace_question_mark<T: AsRef<[char]>>(input: T) -> Vec<char> {
+    let mut new_regex: Vec<char> = Vec::new();
+
+    let mut parenthesis_stack = Vec::new();
+    let mut last_parenthesis = None;
+
+    for (i, c) in input.as_ref().iter().enumerate() {
+        new_regex.push(*c);
+
+        match c {
+            '(' => parenthesis_stack.push(i),
+            ')' => {
+                if parenthesis_stack.is_empty() {
+                    // FIXME: Find better way to handle this.
+                    panic!("Unclosed parenthesis.");
+                }
+                last_parenthesis = parenthesis_stack.pop();
+            }
+            '?' => match new_regex.get(i - 1) {
+                Some(previous_char) => {
+                    if *previous_char == ')' {
+                        new_regex.insert(last_parenthesis.unwrap(), '(');
+                    }
+                }
+                None => {
+                    // FIXME: Handle this.
+                    panic!("First char is +.")
+                }
+            },
+            _ => {}
+        }
+    }
+
+    new_regex
+}
+*/
 
 fn greater_precedence(first: char, second: char) -> bool {
     let mut found_first = false;

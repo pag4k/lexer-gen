@@ -51,3 +51,50 @@ impl CharacterClass {
         self.bits = !self.bits;
     }
 }
+
+pub struct CharacterClass128 {
+    bits: u128,
+}
+
+impl Default for CharacterClass128 {
+    fn default() -> Self {
+        CharacterClass128 { bits: 0 }
+    }
+}
+
+impl CharacterClass128 {
+    fn to_shift(char: char) -> u8 {
+        char as u8
+    }
+
+    fn to_char(shift: u8) -> char {
+        match shift {
+            0..=127 => shift as char,
+            _ => unreachable!(),
+        }
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.bits == 0
+    }
+
+    pub fn to_array(&self) -> Vec<char> {
+        (0..=127)
+            .into_iter()
+            .filter(|shift| (self.bits & ((1 as u128) << shift)) != 0)
+            .map(Self::to_char)
+            .collect()
+    }
+
+    pub fn add(&mut self, char: char) {
+        self.bits ^= (1 as u128) << Self::to_shift(char);
+    }
+
+    pub fn add_slice(&mut self, chars: &[char]) {
+        chars.iter().for_each(|&char| self.add(char));
+    }
+
+    pub fn negate(&mut self) {
+        self.bits = !self.bits;
+    }
+}

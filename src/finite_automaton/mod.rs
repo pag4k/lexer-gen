@@ -1,5 +1,5 @@
 extern crate alloc;
-/*
+
 use alloc::collections::btree_map::BTreeMap;
 use alloc::collections::btree_set::BTreeSet;
 use alloc::vec::Vec;
@@ -7,7 +7,7 @@ use alloc::vec::Vec;
 //use crate::regular_expression::Regex;
 
 // The NFA defined here is limited since it assumes it will be created using
-// Thompson's construction.regular_expression.
+// Thompson's construction.
 // We can assume that each state will only have either one normal transition
 // or up to 2 epsilon transitions (except the initial state that goes to all regex line).
 
@@ -35,6 +35,8 @@ pub struct NFA {
 }
 
 impl NFA {
+    // This function assumes that the regex is in a particular form, as transformed in
+    // regular_expression/.
     pub fn from_regex(regex_list: &[Vec<char>]) -> NFA {
         // For NFA.
         let mut alphabet = BTreeSet::new();
@@ -50,14 +52,19 @@ impl NFA {
             last_state,
             final_states,
         };
+
         // Reserve state 0 for first state.
         for regex in regex_list {
             let mut stack: Vec<(usize, usize)> = Vec::new();
-            for c in regex {
+            for (i, c) in regex.iter().enumerate() {
                 match c {
                     '*' => {
                         let sub_nfa = stack.pop().unwrap();
-                        stack.push(nfa.add_closure_subgraph(sub_nfa));
+                        stack.push(nfa.add_kleene_star_subgraph(sub_nfa));
+                    }
+                    '+' => {
+                        let sub_nfa = stack.pop().unwrap();
+                        stack.push(nfa.add_kleene_plus_subgraph(sub_nfa));
                     }
                     '?' => {
                         let sub_nfa = stack.pop().unwrap();
@@ -69,6 +76,12 @@ impl NFA {
                         stack.push(nfa.add_union_subgraph(left_sub_nfa, right_sub_nfa));
                     }
                     '⋅' => {
+                        if stack.len() < 2 {
+                            panic!(
+                                "Stack does not have two elements: {}",
+                                regex[0..=i].iter().collect::<String>()
+                            );
+                        }
                         let right_sub_nfa = stack.pop().unwrap();
                         let left_sub_nfa = stack.pop().unwrap();
                         stack.push(nfa.add_concat_subgraph(left_sub_nfa, right_sub_nfa));
@@ -106,7 +119,6 @@ impl NFA {
         let new_end = self.add_state();
         self.function
             .insert((new_start, Some(c)), [new_end].iter().cloned().collect());
-        // self.final_states.insert(new_end);
         (new_start, new_end)
     }
 
@@ -117,7 +129,6 @@ impl NFA {
     ) -> (usize, usize) {
         self.function
             .insert((end1, None), [start2].iter().cloned().collect());
-        // self.final_states.remove(&end1);
         (start1, end2)
     }
 
@@ -136,9 +147,6 @@ impl NFA {
             .insert((end1, None), [new_end].iter().cloned().collect());
         self.function
             .insert((end2, None), [new_end].iter().cloned().collect());
-        // self.final_states.remove(&end1);
-        // self.final_states.remove(&end2);
-        // self.final_states.insert(new_end);
         (new_start, new_end)
     }
 
@@ -151,12 +159,10 @@ impl NFA {
         );
         self.function
             .insert((end, None), [new_end].iter().cloned().collect());
-        // self.final_states.remove(&end);
-        // self.final_states.insert(new_end);
         (new_start, new_end)
     }
 
-    fn add_closure_subgraph(&mut self, (start, end): (usize, usize)) -> (usize, usize) {
+    fn add_kleene_star_subgraph(&mut self, (start, end): (usize, usize)) -> (usize, usize) {
         let new_start = self.add_state();
         let new_end = self.add_state();
         self.function.insert(
@@ -165,8 +171,16 @@ impl NFA {
         );
         self.function
             .insert((end, None), [start, new_end].iter().cloned().collect());
-        // self.final_states.remove(&end);
-        // self.final_states.insert(new_end);
+        (new_start, new_end)
+    }
+
+    fn add_kleene_plus_subgraph(&mut self, (start, end): (usize, usize)) -> (usize, usize) {
+        let new_start = self.add_state();
+        let new_end = self.add_state();
+        self.function
+            .insert((new_start, None), [start].iter().cloned().collect());
+        self.function
+            .insert((end, None), [start, new_end].iter().cloned().collect());
         (new_start, new_end)
     }
 
@@ -326,5 +340,22 @@ impl DFA {
             nfa_to_dfa_states_map,
         )
     }
+
+    pub fn remove_trap(&mut self) {
+        // Assume there is only one trap state.
+        let mut trap_states = self.states.clone();
+        for ((from, _), to) in &self.function {
+            if from != to {
+                trap_states.remove(&from);
+            }
+        }
+        assert!(trap_states.len() == 1);
+        let trap_state = trap_states.into_iter().next().unwrap();
+        self.states.remove(&trap_state);
+        for (pair, to) in self.function.clone() {
+            if to == trap_state {
+                self.function.remove(&pair);
+            }
+        }
+    }
 }
-*/

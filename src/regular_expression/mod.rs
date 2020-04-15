@@ -31,7 +31,7 @@ fn replace_classes<T: AsRef<[char]>>(input: T) -> Vec<char> {
             let negated = output[position] == '^';
             position += if negated { 1 } else { 0 };
             while position < right_position {
-                println!("Char {}", output[position]);
+                //println!("Char {}", output[position]);
                 if position + 2 < right_position && output[position + 1] == '-' {
                     let start_char = output[position];
                     let end_char = output[position + 2];
@@ -89,6 +89,7 @@ fn replace_classes<T: AsRef<[char]>>(input: T) -> Vec<char> {
             //panic!("ERROR: Brackets should some in pairs.");
         }
     }
+    dbg!(output.clone().into_iter().collect::<String>());
     output
 }
 
@@ -112,6 +113,7 @@ fn add_explicit_concat<T: AsRef<[char]>>(input: T) -> Vec<char> {
         }
     }
 
+    dbg!(new_regex.clone().into_iter().collect::<String>());
     new_regex
 }
 
@@ -201,6 +203,7 @@ fn to_postfix<T: AsRef<[char]>>(input: T) -> Vec<char> {
     operator_stack.sort_by_cached_key(|a| OPERATORS.iter().find(|c| a == *c).unwrap());
     new_regex.append(&mut operator_stack);
 
+    dbg!(new_regex.clone().into_iter().collect::<String>());
     new_regex
 }
 

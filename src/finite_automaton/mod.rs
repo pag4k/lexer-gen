@@ -1,9 +1,8 @@
 extern crate alloc;
 
-use alloc::collections::btree_map::BTreeMap;
+use alloc::collections::btree_map::{BTreeMap, Entry};
 use alloc::collections::btree_set::BTreeSet;
 use alloc::vec::Vec;
-
 //use crate::regular_expression::Regex;
 
 // The NFA defined here is limited since it assumes it will be created using
@@ -224,9 +223,9 @@ impl NFA {
 #[derive(Debug)]
 pub struct DFA {
     pub states: BTreeSet<usize>,
-    alphabet: BTreeSet<char>,
+    pub alphabet: BTreeSet<char>,
     pub function: BTreeMap<(usize, char), usize>,
-    initial_state: usize,
+    pub initial_state: usize,
     pub final_states: BTreeSet<usize>,
 }
 
@@ -251,11 +250,11 @@ impl DFA {
     ///
     /// Since multiple NFA states correspond to a single DFA state, the NFA states will be sorted
     /// to make sure the comparisons are done properly.
-    pub fn from_nfa(nfa: NFA, alphabet: &[char]) -> (Self, BTreeMap<Vec<usize>, usize>) {
+    pub fn from_nfa(nfa: NFA, _alphabet: &[char]) -> (Self, BTreeMap<Vec<usize>, usize>) {
         let mut nfa_to_dfa_states_map: BTreeMap<Vec<usize>, usize> = BTreeMap::new();
         let mut marked_states: BTreeMap<usize, bool> = BTreeMap::new();
         let mut function: BTreeMap<(usize, char), usize> = BTreeMap::new();
-
+        let mut alphabet = nfa.alphabet.clone();
         let epsilon_closure = nfa.get_epsilon_closure();
         //println!("##### EPSILON CLOSURE DONE");
 
@@ -277,7 +276,7 @@ impl DFA {
             marked_states.insert(unmarked_state_dfa, true);
 
             // Iterator over all symbol in the alphabet.
-            for &current_symbol in nfa.alphabet.iter() {
+            for &current_symbol in alphabet.iter() {
                 // Get the resulting DFA state.
                 let mut states: Vec<usize> = unmarked_states_nfa
                     .iter()
@@ -332,7 +331,7 @@ impl DFA {
         (
             DFA {
                 states: nfa_to_dfa_states_map.values().cloned().collect(),
-                alphabet: BTreeSet::new(),
+                alphabet,
                 function,
                 initial_state: 0,
                 final_states,
@@ -356,6 +355,144 @@ impl DFA {
             if to == trap_state {
                 self.function.remove(&pair);
             }
+        }
+    }
+}
+
+pub fn hopcroft(dfa: &DFA) -> DFA {
+    let final_states: BTreeSet<usize> = dfa.final_states.clone().into_iter().collect();
+    let non_final_states: BTreeSet<usize> = dfa
+        .states
+        .clone()
+        .into_iter()
+        .filter(|state| !dfa.final_states.contains(state))
+        .collect();
+    let alphabet = dfa.alphabet.clone();
+    //   dbg!(&alphabet);
+    //   dbg!(&final_states);
+    //  dbg!(&non_final_states);
+    // P is the partition.
+    let mut p = vec![final_states, non_final_states];
+    // W is the set to try to partition.
+    let mut w = p.clone();
+    while let Some(a) = w.pop() {
+        for &c in &alphabet {
+            let x: BTreeSet<usize> = dfa
+                .function
+                .iter()
+                .filter_map(|(&(from, char), to)| {
+                    if char == c && a.contains(to) {
+                        Some(from)
+                    } else {
+                        None
+                    }
+                })
+                .collect();
+            let mut index_to_remove: Vec<usize> = Default::default();
+            let mut new_p: Vec<BTreeSet<usize>> = Default::default();
+            for (i, y) in p.iter().enumerate() {
+                let intersection: BTreeSet<usize> = x.intersection(y).cloned().collect();
+                let difference: BTreeSet<usize> = y.difference(&x).cloned().collect();
+                if !intersection.is_empty() && !difference.is_empty() {
+                    index_to_remove.push(i);
+                    new_p.push(intersection.clone());
+                    new_p.push(difference.clone());
+                    if let Some(position) = w.iter().position(|set| *set == *y) {
+                        w.remove(position);
+                        w.push(intersection.clone());
+                        w.push(difference.clone());
+                    } else {
+                        if intersection.len() <= difference.len() {
+                            w.push(intersection.clone());
+                        } else {
+                            w.push(difference.clone());
+                        }
+                    }
+                }
+            }
+            p = p
+                .into_iter()
+                .enumerate()
+                .filter_map(|(i, y)| {
+                    if index_to_remove.contains(&i) {
+                        None
+                    } else {
+                        Some(y)
+                    }
+                })
+                .collect();
+            p.append(&mut new_p);
+        }
+    }
+
+    // Construct the minimal DFA.
+    let initial_state: usize = p
+        .iter()
+        .position(|set| set.contains(&dfa.initial_state))
+        .unwrap();
+    let final_states: BTreeSet<usize> = p
+        .iter()
+        .enumerate()
+        .filter_map(|(i, set)| {
+            if dfa
+                .final_states
+                .iter()
+                .any(|final_state| set.contains(final_state))
+            {
+                Some(i)
+            } else {
+                None
+            }
+        })
+        .collect();
+    let mut function: BTreeMap<(usize, char), usize> = Default::default();
+    for ((from, char), to) in &dfa.function {
+        let new_from: usize = p.iter().position(|set| set.contains(&from)).unwrap();
+        let new_to: usize = p.iter().position(|set| set.contains(&to)).unwrap();
+        //        println!("{}: {} => {} to {} => {}", char, from, to, new_from, new_to);
+        function.insert((new_from, *char), new_to);
+    }
+    DFA {
+        states: (0..p.len()).into_iter().collect(),
+        alphabet,
+        function,
+        initial_state,
+        final_states,
+    }
+}
+
+#[derive(Debug)]
+pub struct DFA2 {
+    pub states: BTreeSet<usize>,
+    pub alphabet: BTreeSet<char>,
+    pub function: BTreeMap<(usize, usize), BTreeSet<char>>,
+    pub initial_state: usize,
+    pub final_states: BTreeSet<usize>,
+}
+
+impl DFA2 {
+    pub fn from_DFA(dfa: &DFA) -> Self {
+        let mut function: BTreeMap<(usize, usize), BTreeSet<char>> = Default::default();
+        //     dbg!(&dfa.function);
+        for (&(from, char), &to) in dfa.function.iter() {
+            match function.entry((from, to)) {
+                Entry::Vacant(entry) => {
+                    let mut new_entry: BTreeSet<char> = Default::default();
+                    new_entry.insert(char);
+                    entry.insert(new_entry);
+                }
+                Entry::Occupied(mut entry) => {
+                    entry.get_mut().insert(char);
+                }
+            };
+        }
+
+        DFA2 {
+            states: dfa.states.clone(),
+            alphabet: dfa.alphabet.clone(),
+            function,
+            initial_state: dfa.initial_state,
+            final_states: dfa.final_states.clone(),
         }
     }
 }

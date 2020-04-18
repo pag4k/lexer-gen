@@ -23,25 +23,37 @@ fn main() {
     let alphabet = vec!['a', 'b', 'c'];
     let regex1 = regular_expression::regex(vec!['a', 'b']);
     let regex2 = regular_expression::regex(vec!['a', 'b', 'b']);
-    let float_string = String::from("{integer}");
+    let integer_string = String::from("(([1-2][0-2]*)|0)");
+    let float_string =
+        String::from("(([1-2][0-2]*)|0).(([0-2]*[1-2])|0)((e(a|b)?)(([1-2][0-2]*)|0))?");
+    //"(.(({digit}*{nonzero})|0))".to_string(),
     //let float_string = String::from("{integer}{fraction}(e(+|-){integer})");
-    let mut strings = vec![float_string];
-    replace_symbolic_name(&mut strings, get_symbolic_names());
-    dbg!(&strings[0]);
-    let float_regex = regular_expression::regex(strings[0].chars().collect::<Vec<char>>());
-    let regex_list = vec![float_regex];
-    dbg!(regex_list[0].clone().into_iter().collect::<String>());
+    let strings = vec![integer_string, float_string];
+    //replace_symbolic_name(&mut strings, get_symbolic_names());
+    //dbg!(&strings[0]);
+    let integer_regex = regular_expression::regex(strings[0].chars().collect::<Vec<char>>());
+    let float_regex = regular_expression::regex(strings[1].chars().collect::<Vec<char>>());
+    let regex_list = vec![integer_regex, float_regex];
+    //dbg!(regex_list[0].clone().into_iter().collect::<String>());
     let nfa = finite_automaton::NFA::from_regex(&regex_list);
     let (mut dfa, _) = finite_automaton::DFA::from_nfa(nfa, &SIGMA);
     let dot_graph = dot_generator::DotGraph::from_dfa(&dfa);
     let mut file = File::create("test.dot").unwrap();
     file.write_all(&dot_graph.code).unwrap();
+    let mut dfa = finite_automaton::hopcroft(&dfa);
     dfa.remove_trap();
-    let dot_graph = dot_generator::DotGraph::from_dfa(&dfa);
+    let dfa2 = finite_automaton::DFA2::from_DFA(&dfa);
+    let dot_graph = dot_generator::DotGraph::from_dfa2(&dfa2);
+    //dbg!(&dfa2);
     let mut file = File::create("test_no_trap.dot").unwrap();
     file.write_all(&dot_graph.code).unwrap();
 }
-
+// To check backtrack:
+// - Find final states.
+// - If all alphabet goes to trap, no backtrack.
+// - If not, need one more symbol to verify if final.
+// - Two option, leave dfa like this and find a way to deal with backtrack.
+// - Or, add a new final state that will replace and backtrack.
 // let regex1: Regex = to_postfix(&add_explicit_concat(&vec![
 //     '(', 'a', '|', 'b', ')', '*', 'c',
 // ]));

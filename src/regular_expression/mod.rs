@@ -1,5 +1,5 @@
 extern crate alloc;
-mod character_class;
+pub mod character_class;
 
 use alloc::vec::Vec;
 use character_class::*;

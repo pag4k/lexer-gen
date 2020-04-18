@@ -1,3 +1,12 @@
+use core::ops::RangeInclusive;
+
+const CHAR_SETS: [RangeInclusive<u8>; 3] = [
+    RangeInclusive::new(48, 57),
+    RangeInclusive::new(65, 90),
+    RangeInclusive::new(97, 122),
+];
+
+const FF: [usize; 2] = [6, 6];
 pub struct CharacterClass {
     bits: u64,
 }
@@ -97,4 +106,24 @@ impl CharacterClass128 {
     pub fn negate(&mut self) {
         self.bits = !self.bits;
     }
+}
+
+pub fn to_character_class<T: AsRef<[char]>>(set: T) -> String {
+    let mut bits: u128 = 0;
+    for &char in set.as_ref() {
+        bits ^= (1 as u128) << char as u8;
+    }
+    let mut string: String = Default::default();
+    /*for shift in (0 as u8)..(127 as u8) {
+        if bits & ((1 as u128) << shift) != 0 {
+            string.push(shift as char);
+        }
+    }*/
+    for &char in set.as_ref() {
+        string.push(char);
+    }
+    //48..=57 => (char as u8) - 48,
+    //65..=90 => (char as u8) - 65 + 10,
+    //97..=122 => (char as u8) - 97 + 36,
+    string
 }

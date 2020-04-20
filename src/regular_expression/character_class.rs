@@ -1,3 +1,4 @@
+/*
 use core::ops::RangeInclusive;
 
 const CHAR_SETS: [RangeInclusive<u8>; 3] = [
@@ -7,6 +8,8 @@ const CHAR_SETS: [RangeInclusive<u8>; 3] = [
 ];
 
 const FF: [usize; 2] = [6, 6];
+*/
+
 pub struct CharacterClass {
     bits: u64,
 }
@@ -61,6 +64,7 @@ impl CharacterClass {
     }
 }
 
+/*
 pub struct CharacterClass128 {
     bits: u128,
 }
@@ -107,7 +111,9 @@ impl CharacterClass128 {
         self.bits = !self.bits;
     }
 }
+*/
 
+/*
 pub fn to_character_class<T: AsRef<[char]>>(set: T) -> String {
     let mut bits: u128 = 0;
     for &char in set.as_ref() {
@@ -127,3 +133,4 @@ pub fn to_character_class<T: AsRef<[char]>>(set: T) -> String {
     //97..=122 => (char as u8) - 97 + 36,
     string
 }
+*/

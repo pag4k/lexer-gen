@@ -7,8 +7,7 @@ mod regular_expression;
 use std::fs::File;
 use std::io::prelude::*;
 
-use alloc::collections::btree_map::BTreeMap;
-use alloc::collections::btree_set::BTreeSet;
+//use alloc::collections::btree_map::BTreeMap;
 use alloc::vec::Vec;
 
 pub const SIGMA: [char; 87] = [
@@ -20,9 +19,9 @@ pub const SIGMA: [char; 87] = [
 ];
 
 fn main() {
-    let alphabet = vec!['a', 'b', 'c'];
-    let regex1 = regular_expression::regex(vec!['a', 'b']);
-    let regex2 = regular_expression::regex(vec!['a', 'b', 'b']);
+    //let alphabet = vec!['a', 'b', 'c'];
+    //let regex1 = regular_expression::regex(vec!['a', 'b']);
+    //let regex2 = regular_expression::regex(vec!['a', 'b', 'b']);
     let integer_string = String::from("(([1-2][0-2]*)|0)");
     let float_string =
         String::from("(([1-2][0-2]*)|0).(([0-2]*[1-2])|0)((e(a|b)?)(([1-2][0-2]*)|0))?");
@@ -35,15 +34,15 @@ fn main() {
     let float_regex = regular_expression::regex(strings[1].chars().collect::<Vec<char>>());
     let regex_list = vec![integer_regex, float_regex];
     //dbg!(regex_list[0].clone().into_iter().collect::<String>());
-    let nfa = finite_automaton::NFA::from_regex(&regex_list);
-    let (mut dfa, _) = finite_automaton::DFA::from_nfa(nfa, &SIGMA);
+    let nfa = finite_automaton::set_nfa::SetNFA::from_regex(&regex_list);
+    let (dfa, _) = finite_automaton::set_dfa::SetDFA::from_nfa(nfa, &SIGMA);
     let dot_graph = dot_generator::DotGraph::from_dfa(&dfa);
     let mut file = File::create("test.dot").unwrap();
     file.write_all(&dot_graph.code).unwrap();
-    let mut dfa = finite_automaton::hopcroft(&dfa);
+    let mut dfa = finite_automaton::set_dfa::SetDFA::hopcroft(&dfa);
     dfa.remove_trap();
-    let dfa2 = finite_automaton::DFA2::from_DFA(&dfa);
-    let dot_graph = dot_generator::DotGraph::from_dfa2(&dfa2);
+    //    let dfa2 = finite_automaton::DFA2::from_DFA(&dfa);
+    //let dot_graph = dot_generator::DotGraph::from_dfa2(&dfa);
     //dbg!(&dfa2);
     let mut file = File::create("test_no_trap.dot").unwrap();
     file.write_all(&dot_graph.code).unwrap();
@@ -83,6 +82,7 @@ fn main() {
 // code = code.replace("\"", "'");
 // print!("{:#?}", code);
 
+/*
 fn get_symbolic_names() -> BTreeMap<String, String> {
     let mut symbolic_names_map = BTreeMap::new();
     symbolic_names_map.insert("{alphanum}".to_string(), "[a-zA-Z0-9]".to_string());
@@ -120,3 +120,4 @@ fn replace_symbolic_name(strings: &mut Vec<String>, symbolic_names_map: BTreeMap
         break;
     }
 }
+*/

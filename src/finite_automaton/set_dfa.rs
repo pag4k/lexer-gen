@@ -53,11 +53,11 @@ impl SetDFA {
     pub fn from_nfa<'a>(
         nfa: impl NFA<'a, usize>,
         _alphabet: &[char],
-    ) -> (Self, BTreeMap<Vec<usize>, usize>) {
+    ) -> (Self, BTreeMap<BTreeSet<usize>, usize>) {
         let mut nfa_to_dfa_states_map: BTreeMap<Vec<usize>, usize> = BTreeMap::new();
         let mut marked_states: BTreeMap<usize, bool> = BTreeMap::new();
         let mut function: BTreeMap<(usize, char), usize> = BTreeMap::new();
-        let alphabet = nfa.alphabet().into_iter().collect();
+        let alphabet = nfa.alphabet().collect();
         let epsilon_closure = get_epsilon_closure(&nfa);
         //println!("##### EPSILON CLOSURE DONE");
 
@@ -113,13 +113,15 @@ impl SetDFA {
         // It is assumed that there is only one NFA final state for each DFA state.
         let mut final_states: BTreeSet<usize> = BTreeSet::new();
         for current_states in nfa_to_dfa_states_map.keys() {
-            if current_states
+            let final_states_count = current_states
                 .iter()
                 .filter(|&&state| nfa.is_final_state(state))
-                .count()
-                > 1
-            {
-                unreachable!("A DFA state corresponds to more than one NFA final states.");
+                .count();
+            if final_states_count > 1 {
+                unreachable!(
+                    "A DFA state has to correspond to at most one NFA final states: {}.",
+                    final_states_count
+                );
             }
             if let Some(&state_id) = current_states
                 .iter()
@@ -139,7 +141,15 @@ impl SetDFA {
                 initial_state: 0,
                 final_states,
             },
-            nfa_to_dfa_states_map,
+            nfa_to_dfa_states_map
+                .into_iter()
+                .map(|(nfa_states, dfa_state)| {
+                    (
+                        nfa_states.into_iter().collect::<BTreeSet<usize>>(),
+                        dfa_state,
+                    )
+                })
+                .collect(),
         )
     }
 
@@ -147,7 +157,7 @@ impl SetDFA {
         // Assume there is only one trap state.
         let mut trap_states = self.states.clone();
         for ((from, _), to) in &self.function {
-            if from != to {
+            if from != to || self.is_final_state(*to) {
                 trap_states.remove(&from);
             }
         }
@@ -161,7 +171,7 @@ impl SetDFA {
         }
     }
 
-    pub fn hopcroft<'a>(dfa: &impl DFA<'a, usize>) -> Self {
+    pub fn hopcroft<'a>(dfa: &impl DFA<'a, usize>) -> (Self, BTreeMap<BTreeSet<usize>, usize>) {
         let old_states: Vec<usize> = dfa.states().collect();
         let final_states: BTreeSet<usize> = dfa.final_states().collect();
         let non_final_states: BTreeSet<usize> = old_states
@@ -177,6 +187,7 @@ impl SetDFA {
         let mut p = vec![final_states, non_final_states];
         // W is the set to try to partition.
         let mut w = p.clone();
+
         while let Some(a) = w.pop() {
             for &c in &alphabet {
                 // let X be the set of states for which a transition on c leads to a state in A
@@ -207,12 +218,10 @@ impl SetDFA {
                             w.remove(position);
                             w.push(intersection.clone());
                             w.push(difference.clone());
+                        } else if intersection.len() <= difference.len() {
+                            w.push(intersection.clone());
                         } else {
-                            if intersection.len() <= difference.len() {
-                                w.push(intersection.clone());
-                            } else {
-                                w.push(difference.clone());
-                            }
+                            w.push(difference.clone());
                         }
                     }
                 }
@@ -264,12 +273,20 @@ impl SetDFA {
             }
         }
 
-        SetDFA {
-            states: (0..p.len()).into_iter().collect(),
-            alphabet,
-            function,
-            initial_state,
-            final_states,
-        }
+        (
+            SetDFA {
+                states: (0..p.len()).collect(),
+                alphabet,
+                function,
+                initial_state,
+                final_states,
+            },
+            p.into_iter()
+                .enumerate()
+                .map(|(hopcroft_state, dfa_states)| {
+                    (dfa_states.into_iter().collect(), hopcroft_state)
+                })
+                .collect(),
+        )
     }
 }

@@ -27,7 +27,7 @@ impl<'a> NFA<'_, usize> for SetNFA {
     }
 
     fn states(&self) -> Box<dyn Iterator<Item = usize>> {
-        Box::new((0..=self.last_state).into_iter())
+        Box::new(0..=self.last_state)
     }
 
     /// Return the next state based on a state and an input character.
@@ -51,7 +51,7 @@ impl<'a> NFA<'_, usize> for SetNFA {
 impl SetNFA {
     // usizehis function assumes that the regex is in a particular form, as transformed in
     // regular_expression/.
-    pub fn from_regex(regex_list: &[Vec<char>]) -> impl NFA<usize> {
+    pub fn from_regex(regex_list: &[Vec<char>]) -> (impl NFA<usize>, Vec<usize>) {
         // For NFA.
         let alphabet = BTreeSet::new();
         let function: BTreeMap<(usize, Option<char>), BTreeSet<usize>> = BTreeMap::new();
@@ -67,11 +67,24 @@ impl SetNFA {
             final_states,
         };
 
+        let mut final_states: Vec<usize> = Default::default();
+
         // Reserve state 0 for first state.
         for regex in regex_list {
             let mut stack: Vec<(usize, usize)> = Vec::new();
+            let mut escape_char = false;
             for (i, c) in regex.iter().enumerate() {
+                if escape_char {
+                    escape_char = false;
+                    if crate::regular_expression::ESCAPE_CHAR.contains(c) {
+                        stack.push(nfa.add_symbol_subgraph(*c));
+                        continue;
+                    } else {
+                        stack.push(nfa.add_symbol_subgraph('\\'));
+                    }
+                }
                 match c {
+                    '\\' => escape_char = true,
                     '*' => {
                         let sub_nfa = stack.pop().unwrap();
                         stack.push(nfa.add_kleene_star_subgraph(sub_nfa));
@@ -103,6 +116,8 @@ impl SetNFA {
                     _ => stack.push(nfa.add_symbol_subgraph(*c)),
                 }
             }
+            final_states.push(nfa.last_state);
+            debug_assert!(!escape_char);
             // For the case where the regex was empty.
             if !stack.is_empty() {
                 let (final_start, final_end) = stack.pop().unwrap();
@@ -119,7 +134,7 @@ impl SetNFA {
             }
         }
 
-        nfa
+        (nfa, final_states)
     }
 
     fn add_state(&mut self) -> usize {

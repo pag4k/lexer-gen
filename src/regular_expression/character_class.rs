@@ -45,7 +45,6 @@ impl CharacterClass {
 
     pub fn to_array(&self) -> Vec<char> {
         (0..=61)
-            .into_iter()
             .filter(|shift| (self.bits & ((1 as u64) << shift)) != 0)
             .map(Self::to_char)
             .collect()

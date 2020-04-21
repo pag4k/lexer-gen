@@ -7,7 +7,8 @@ mod regular_expression;
 use std::fs::File;
 use std::io::prelude::*;
 
-//use alloc::collections::btree_map::BTreeMap;
+use alloc::collections::btree_map::BTreeMap;
+use alloc::collections::btree_set::BTreeSet;
 use alloc::vec::Vec;
 
 pub const SIGMA: [char; 87] = [
@@ -34,17 +35,57 @@ fn main() {
     let float_regex = regular_expression::regex(strings[1].chars().collect::<Vec<char>>());
     let regex_list = vec![integer_regex, float_regex];
     //dbg!(regex_list[0].clone().into_iter().collect::<String>());
-    let nfa = finite_automaton::set_nfa::SetNFA::from_regex(&regex_list);
-    let (dfa, _) = finite_automaton::set_dfa::SetDFA::from_nfa(nfa, &SIGMA);
-    let dot_graph = dot_generator::DotGraph::from_dfa(&dfa);
-    let mut file = File::create("test.dot").unwrap();
+    let (nfa, final_states) = finite_automaton::set_nfa::SetNFA::from_regex(&regex_list);
+    dbg!(&final_states);
+    let dot_graph = dot_generator::DotGraph::from_nfa(&nfa);
+    let mut file = File::create("nfa.dot").unwrap();
     file.write_all(&dot_graph.code).unwrap();
-    let mut dfa = finite_automaton::set_dfa::SetDFA::hopcroft(&dfa);
+    let (dfa, nfa_to_dfa_map) = finite_automaton::set_dfa::SetDFA::from_nfa(nfa, &SIGMA);
+    let final_states2: Vec<BTreeSet<usize>> = final_states
+        .into_iter()
+        .map(|nfa_state| {
+            nfa_to_dfa_map
+                .clone()
+                .into_iter()
+                .filter_map(|(nfa_states, dfa_state)| {
+                    if nfa_states.contains(&nfa_state) {
+                        Some(dfa_state)
+                    } else {
+                        None
+                    }
+                })
+                .collect()
+        })
+        .collect();
+    dbg!(&final_states2);
+    let dot_graph = dot_generator::DotGraph::from_dfa(&dfa);
+    let mut file = File::create("dfa.dot").unwrap();
+    file.write_all(&dot_graph.code).unwrap();
+    let (mut dfa, dfa_to_hopcroft_map) = finite_automaton::set_dfa::SetDFA::hopcroft(&dfa);
+    let final_states3: Vec<Vec<usize>> = final_states2
+        .into_iter()
+        .map(|final_dfa_states| {
+            dfa_to_hopcroft_map
+                .iter()
+                .filter_map(|(dfa_states, &hopcroft_state)| {
+                    if final_dfa_states.is_superset(dfa_states) {
+                        Some(hopcroft_state)
+                    } else {
+                        None
+                    }
+                })
+                .collect()
+        })
+        .collect();
+    dbg!(&final_states3);
+    let dot_graph = dot_generator::DotGraph::from_dfa(&dfa);
+    let mut file = File::create("dfa_hop.dot").unwrap();
+    file.write_all(&dot_graph.code).unwrap();
     dfa.remove_trap();
     //    let dfa2 = finite_automaton::DFA2::from_DFA(&dfa);
     //let dot_graph = dot_generator::DotGraph::from_dfa2(&dfa);
-    //dbg!(&dfa2);
-    let mut file = File::create("test_no_trap.dot").unwrap();
+    let dot_graph = dot_generator::DotGraph::from_dfa(&dfa);
+    let mut file = File::create("dfa_no_trap.dot").unwrap();
     file.write_all(&dot_graph.code).unwrap();
 }
 // To check backtrack:

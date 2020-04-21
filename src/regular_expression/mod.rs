@@ -4,6 +4,8 @@ pub mod character_class;
 use alloc::vec::Vec;
 use character_class::*;
 
+pub const ESCAPE_CHAR: [char; 10] = ['*', '+', '?', '|', '^', '⋅', '(', ')', '[', ']'];
+
 const CONCAT_CHAR: char = '⋅';
 const NOT_AFTER: [char; 2] = ['(', '|'];
 const NOT_BEFORE: [char; 4] = ['*', '?', '|', ')'];
@@ -22,6 +24,7 @@ pub fn regex<T: AsRef<[char]>>(input: T) -> Vec<char> {
     ))))
 }
 
+// FIXME: Assume there are no escape char in classes.
 fn replace_classes<T: AsRef<[char]>>(input: T) -> Vec<char> {
     let mut output = Vec::from(input.as_ref());
     while let Some(left_position) = output.iter().position(|&c| c == '[') {
@@ -96,11 +99,19 @@ fn replace_classes<T: AsRef<[char]>>(input: T) -> Vec<char> {
 fn add_explicit_concat<T: AsRef<[char]>>(input: T) -> Vec<char> {
     let mut new_regex: Vec<char> = Vec::new();
 
-    for (i, c) in input.as_ref().iter().enumerate() {
-        new_regex.push(*c);
+    for (i, &c) in input.as_ref().iter().enumerate() {
+        new_regex.push(c);
 
+        // If next char is an ESCAPE_CHAR, continue to avoid adding a CONCAT_CHAR.
+        if c == '\\' {
+            if let Some(next_c) = input.as_ref().get(i + 1) {
+                if ESCAPE_CHAR.contains(next_c) {
+                    continue;
+                }
+            }
+        }
         // Skip if current char is in NOT_AFTER.
-        if NOT_AFTER.contains(c) {
+        if NOT_AFTER.contains(&c) {
             continue;
         }
         // Get next char and skip if it is in NOT BEFORE.
@@ -116,44 +127,6 @@ fn add_explicit_concat<T: AsRef<[char]>>(input: T) -> Vec<char> {
     dbg!(new_regex.clone().into_iter().collect::<String>());
     new_regex
 }
-
-/*
-fn replace_question_mark<T: AsRef<[char]>>(input: T) -> Vec<char> {
-    let mut new_regex: Vec<char> = Vec::new();
-
-    let mut parenthesis_stack = Vec::new();
-    let mut last_parenthesis = None;
-
-    for (i, c) in input.as_ref().iter().enumerate() {
-        new_regex.push(*c);
-
-        match c {
-            '(' => parenthesis_stack.push(i),
-            ')' => {
-                if parenthesis_stack.is_empty() {
-                    // FIXME: Find better way to handle this.
-                    panic!("Unclosed parenthesis.");
-                }
-                last_parenthesis = parenthesis_stack.pop();
-            }
-            '?' => match new_regex.get(i - 1) {
-                Some(previous_char) => {
-                    if *previous_char == ')' {
-                        new_regex.insert(last_parenthesis.unwrap(), '(');
-                    }
-                }
-                None => {
-                    // FIXME: Handle this.
-                    panic!("First char is +.")
-                }
-            },
-            _ => {}
-        }
-    }
-
-    new_regex
-}
-*/
 
 fn greater_precedence(first: char, second: char) -> bool {
     let mut found_first = false;
@@ -176,18 +149,27 @@ fn to_postfix<T: AsRef<[char]>>(input: T) -> Vec<char> {
     let mut new_regex: Vec<char> = Vec::new();
     let mut operator_stack: Vec<char> = Vec::new();
 
-    for c in input.as_ref() {
-        if OPERATORS.contains(c) {
+    let mut escape_char = false;
+    for &c in input.as_ref() {
+        if escape_char && ESCAPE_CHAR.contains(&c) {
+            escape_char = false;
+            new_regex.push(c);
+            continue;
+        }
+        if c == '\\' {
+            escape_char = true;
+        }
+        if OPERATORS.contains(&c) {
             while !operator_stack.is_empty()
                 && *operator_stack.last().unwrap() != '('
-                && greater_precedence(*c, *operator_stack.last().unwrap())
+                && greater_precedence(c, *operator_stack.last().unwrap())
             {
                 new_regex.push(operator_stack.pop().unwrap());
             }
-            operator_stack.push(*c);
-        } else if PARENTHESIS.contains(c) {
-            if *c == '(' {
-                operator_stack.push(*c);
+            operator_stack.push(c);
+        } else if PARENTHESIS.contains(&c) {
+            if c == '(' {
+                operator_stack.push(c);
             } else {
                 while !operator_stack.is_empty() && *operator_stack.last().unwrap() != '(' {
                     new_regex.push(operator_stack.pop().unwrap());
@@ -195,7 +177,7 @@ fn to_postfix<T: AsRef<[char]>>(input: T) -> Vec<char> {
                 operator_stack.pop();
             }
         } else {
-            new_regex.push(*c)
+            new_regex.push(c)
         }
     }
 

@@ -117,12 +117,16 @@ impl SetDFA {
                 .iter()
                 .filter(|&&state| nfa.is_final_state(state))
                 .count();
+            /*
             if final_states_count > 1 {
                 unreachable!(
                     "A DFA state has to correspond to at most one NFA final states: {}.",
                     final_states_count
                 );
             }
+            */
+            // If there is more than one final state, take the first.
+            // FIXME: It works, but it is the last token that it kept which is weird.
             if let Some(&state_id) = current_states
                 .iter()
                 .find(|&&state| nfa.is_final_state(state))
@@ -171,7 +175,10 @@ impl SetDFA {
         }
     }
 
-    pub fn hopcroft<'a>(dfa: &impl DFA<'a, usize>) -> (Self, BTreeMap<BTreeSet<usize>, usize>) {
+    pub fn hopcroft<'a>(
+        dfa: &impl DFA<'a, usize>,
+        merge_final_states: bool,
+    ) -> (Self, BTreeMap<BTreeSet<usize>, usize>) {
         let old_states: Vec<usize> = dfa.states().collect();
         let final_states: BTreeSet<usize> = dfa.final_states().collect();
         let non_final_states: BTreeSet<usize> = old_states
@@ -184,7 +191,143 @@ impl SetDFA {
         //   dbg!(&final_states);
         //  dbg!(&non_final_states);
         // P is the partition.
-        let mut p = vec![final_states, non_final_states];
+        let mut p = if merge_final_states {
+            vec![final_states, non_final_states]
+        } else {
+            let mut temp_p = final_states
+                .iter()
+                .map(|&state| {
+                    let mut set: BTreeSet<usize> = Default::default();
+                    set.insert(state);
+                    set
+                })
+                .collect::<Vec<BTreeSet<usize>>>();
+            temp_p.push(non_final_states);
+            temp_p
+        };
+        // W is the set to try to partition.
+        let mut w = p.clone();
+
+        while let Some(a) = w.pop() {
+            for &c in &alphabet {
+                // let X be the set of states for which a transition on c leads to a state in A
+                let x: BTreeSet<usize> = old_states
+                    .iter()
+                    .filter_map(|&from| {
+                        if let Some(to) = dfa.next(from, c) {
+                            if a.contains(&to) {
+                                Some(from)
+                            } else {
+                                None
+                            }
+                        } else {
+                            None
+                        }
+                    })
+                    .collect();
+                let mut index_to_remove: Vec<usize> = Default::default();
+                let mut new_p: Vec<BTreeSet<usize>> = Default::default();
+                for (i, y) in p.iter().enumerate() {
+                    let intersection: BTreeSet<usize> = x.intersection(y).cloned().collect();
+                    let difference: BTreeSet<usize> = y.difference(&x).cloned().collect();
+                    if !intersection.is_empty() && !difference.is_empty() {
+                        index_to_remove.push(i);
+                        new_p.push(intersection.clone());
+                        new_p.push(difference.clone());
+                        if let Some(position) = w.iter().position(|set| *set == *y) {
+                            w.remove(position);
+                            w.push(intersection.clone());
+                            w.push(difference.clone());
+                        } else if intersection.len() <= difference.len() {
+                            w.push(intersection.clone());
+                        } else {
+                            w.push(difference.clone());
+                        }
+                    }
+                }
+                p = p
+                    .into_iter()
+                    .enumerate()
+                    .filter_map(|(i, y)| {
+                        if index_to_remove.contains(&i) {
+                            None
+                        } else {
+                            Some(y)
+                        }
+                    })
+                    .collect();
+                p.append(&mut new_p);
+            }
+        }
+
+        // Construct the minimal DFA.
+        let initial_state: usize = p
+            .iter()
+            .position(|set| set.contains(&dfa.initial_state()))
+            .unwrap();
+        let final_states: BTreeSet<usize> = p
+            .iter()
+            .enumerate()
+            .filter_map(|(i, set)| {
+                if dfa
+                    .final_states()
+                    .any(|final_state| set.contains(&final_state))
+                {
+                    Some(i)
+                } else {
+                    None
+                }
+            })
+            .collect();
+
+        // Map previous function to new one.
+        let mut function: BTreeMap<(usize, char), usize> = Default::default();
+
+        for &from in &old_states {
+            for &input in &alphabet {
+                if let Some(to) = dfa.next(from, input) {
+                    let new_from: usize = p.iter().position(|set| set.contains(&from)).unwrap();
+                    let new_to: usize = p.iter().position(|set| set.contains(&to)).unwrap();
+                    function.insert((new_from, input), new_to);
+                }
+            }
+        }
+
+        (
+            SetDFA {
+                states: (0..p.len()).collect(),
+                alphabet,
+                function,
+                initial_state,
+                final_states,
+            },
+            p.into_iter()
+                .enumerate()
+                .map(|(hopcroft_state, dfa_states)| {
+                    (dfa_states.into_iter().collect(), hopcroft_state)
+                })
+                .collect(),
+        )
+    }
+
+    pub fn hopcroft_plus<'a>(
+        dfa: &impl DFA<'a, usize>,
+        final_states: &Vec<BTreeSet<usize>>,
+    ) -> (Self, BTreeMap<BTreeSet<usize>, usize>) {
+        let old_states: Vec<usize> = dfa.states().collect();
+        //let final_states: BTreeSet<usize> = dfa.final_states().collect();
+        let non_final_states: BTreeSet<usize> = old_states
+            .iter()
+            .filter(|&&state| !dfa.is_final_state(state))
+            .cloned()
+            .collect();
+        let alphabet: BTreeSet<char> = dfa.alphabet().collect();
+        //   dbg!(&alphabet);
+        //   dbg!(&final_states);
+        //  dbg!(&non_final_states);
+        // P is the partition.
+        let mut p = final_states.clone();
+        p.push(non_final_states);
         // W is the set to try to partition.
         let mut w = p.clone();
 

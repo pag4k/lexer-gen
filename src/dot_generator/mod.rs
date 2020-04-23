@@ -3,7 +3,10 @@
 extern crate alloc;
 
 use crate::finite_automaton::*;
+use crate::test::*;
+use alloc::collections::btree_map::{BTreeMap, Entry};
 use alloc::vec::Vec;
+
 /// DotGraph ADT
 pub struct DotGraph {
     pub code: Vec<u8>,
@@ -94,9 +97,7 @@ impl DotGraph {
     }
     pub fn from_dfa<'a>(
         dfa: &impl DFA<'a, usize>,
-        //tokens: &HashMap<usize, TokenType>,
-        //backtrack: &HashSet<usize>,
-        //(first_state, last_state): (usize, usize),
+        final_states_to_token: &BTreeMap<usize, TokenType>,
     ) -> DotGraph {
         let states: Vec<usize> = dfa.states().collect();
         let alphabet: Vec<char> = dfa.alphabet().collect();
@@ -111,7 +112,7 @@ impl DotGraph {
         for state in states.iter().filter(|&&state| dfa.is_final_state(state)) {
             let line = format!(
                 "\tnode [shape = rectangle, label=\"{} -> {}\", fontsize=12] token{};",
-                state, state, state
+                state, final_states_to_token[state], state
             );
             dot_graph.add_line(&line);
         }
@@ -147,11 +148,20 @@ impl DotGraph {
         dot_graph.add_line("");
 
         for &from in &states {
+            let mut transitions: BTreeMap<usize, Vec<char>> = Default::default();
             for &input in &alphabet {
                 if let Some(to) = dfa.next(from, input) {
-                    let line = format!("\t{}\t->\t{}\t[ label = \"{}\" ];", from, to, input);
-                    dot_graph.add_line(&line);
+                    transitions.entry(to).or_default().push(input);
                 }
+            }
+            for (to, inputs) in transitions {
+                let line = format!(
+                    "\t{}\t->\t{}\t[ label = \"{}\" ];",
+                    from,
+                    to,
+                    inputs.into_iter().collect::<String>()
+                );
+                dot_graph.add_line(&line);
             }
         }
 

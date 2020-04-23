@@ -98,6 +98,7 @@ impl DotGraph {
     pub fn from_dfa<'a>(
         dfa: &impl DFA<'a, usize>,
         final_states_to_token: &BTreeMap<usize, TokenType>,
+        backtrack_states: &[usize],
     ) -> DotGraph {
         let states: Vec<usize> = dfa.states().collect();
         let alphabet: Vec<char> = dfa.alphabet().collect();
@@ -125,12 +126,11 @@ impl DotGraph {
             } else {
                 "circle"
             };
-            let color = "black";
-            //  if backtrack.contains(&state) {
-            //     "red"
-            // } else {
-            //     "black"
-            // };
+            let color = if backtrack_states.contains(&state) {
+                "red"
+            } else {
+                "black"
+            };
             let line = format!(
                 "\tnode [shape = {}, label=\"{}\", fontsize=12, color={}] {};",
                 node, state, color, state

@@ -88,26 +88,23 @@ fn main() {
                 .collect()
         })
         .collect();
-    dbg!(&final_states4);
+    //  dbg!(&final_states4);
     let mut final_states_to_token: BTreeMap<usize, test::TokenType> = Default::default();
     for (i, states) in final_states4.into_iter().enumerate() {
         for state in states {
             final_states_to_token.insert(state, language[i].1);
         }
     }
-    let dot_graph = dot_generator::DotGraph::from_dfa(&dfa, &final_states_to_token);
+    //  let dot_graph = dot_generator::DotGraph::from_dfa(&dfa, &final_states_to_token);
     let mut file = File::create("dfa_hop.dot").unwrap();
     file.write_all(&dot_graph.code).unwrap();
     dfa.remove_trap();
     //    let dfa2 = finite_automaton::DFA2::from_DFA(&dfa);
     //let dot_graph = dot_generator::DotGraph::from_dfa2(&dfa);
-    let dot_graph = dot_generator::DotGraph::from_dfa(&dfa, &final_states_to_token);
+    let backtrack_states = finite_automaton::set_dfa::get_backtrack_states(&dfa);
+    let dot_graph =
+        dot_generator::DotGraph::from_dfa(&dfa, &final_states_to_token, &backtrack_states);
     let mut file = File::create("dfa_no_trap.dot").unwrap();
     file.write_all(&dot_graph.code).unwrap();
 }
-// To check backtrack:
-// - Find final states.
-// - If all alphabet goes to trap, no backtrack.
-// - If not, need one more symbol to verify if final.
-// - Two option, leave dfa like this and find a way to deal with backtrack.
-// - Or, add a new final state that will replace and backtrack.
+

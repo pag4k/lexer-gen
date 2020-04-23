@@ -159,12 +159,7 @@ impl SetDFA {
 
     pub fn remove_trap(&mut self) {
         // Assume there is only one trap state.
-        let mut trap_states = self.states.clone();
-        for ((from, _), to) in &self.function {
-            if from != to || self.is_final_state(*to) {
-                trap_states.remove(&from);
-            }
-        }
+        let trap_states = get_trap_states(self);
         assert!(trap_states.len() == 1);
         let trap_state = trap_states.into_iter().next().unwrap();
         self.states.remove(&trap_state);
@@ -432,4 +427,33 @@ impl SetDFA {
                 .collect(),
         )
     }
+}
+
+pub fn get_trap_states<'a, T>(dfa: &impl DFA<'a, T>) -> Vec<T>
+where
+    T: core::cmp::Eq + core::marker::Copy,
+{
+    dfa.states()
+        .filter(|&from| {
+            dfa.alphabet().any(|input| {
+                if let Some(to) = dfa.next(from, input) {
+                    !(from != to || dfa.is_final_state(to))
+                } else {
+                    false
+                }
+            })
+        })
+        .collect()
+}
+
+pub fn get_backtrack_states<'a, T>(dfa: &impl DFA<'a, T>) -> Vec<T>
+where
+    T: core::marker::Copy,
+{
+    dfa.final_states()
+        .filter(|&final_state| {
+            dfa.alphabet()
+                .any(|input| dfa.next(final_state, input).is_some())
+        })
+        .collect()
 }

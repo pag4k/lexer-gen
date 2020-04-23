@@ -92,7 +92,7 @@ fn replace_classes<T: AsRef<[char]>>(input: T) -> Vec<char> {
             //panic!("ERROR: Brackets should some in pairs.");
         }
     }
-    dbg!(output.clone().into_iter().collect::<String>());
+    //dbg!(output.clone().into_iter().collect::<String>());
     output
 }
 
@@ -124,7 +124,7 @@ fn add_explicit_concat<T: AsRef<[char]>>(input: T) -> Vec<char> {
         }
     }
 
-    dbg!(new_regex.clone().into_iter().collect::<String>());
+    //dbg!(new_regex.clone().into_iter().collect::<String>());
     new_regex
 }
 
@@ -185,7 +185,7 @@ fn to_postfix<T: AsRef<[char]>>(input: T) -> Vec<char> {
     operator_stack.sort_by_cached_key(|a| OPERATORS.iter().find(|c| a == *c).unwrap());
     new_regex.append(&mut operator_stack);
 
-    dbg!(new_regex.clone().into_iter().collect::<String>());
+    //dbg!(new_regex.clone().into_iter().collect::<String>());
     new_regex
 }
 
@@ -198,8 +198,7 @@ mod tests {
     fn add_concat() {
         let regex1 = add_explicit_concat(&vec!['(', 'a', '|', 'b', ')', '*', 'c']);
         let regex2 = vec!['(', 'a', '|', 'b', ')', '*', CONCAT_CHAR, 'c'];
-        //assert!(equal(&regex1, &regex2));
-        //assert_eq!(regex1, regex2);
+        assert_eq!(regex1, regex2);
     }
 
     #[test]

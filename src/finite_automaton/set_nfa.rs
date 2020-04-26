@@ -12,7 +12,7 @@ pub struct SetNFA {
     pub final_states: BTreeSet<usize>,
 }
 
-// usizeODO: Not sure I understand these lifetime.
+// TODO: Not sure I understand these lifetime.
 impl<'a> NFA<'_, usize> for SetNFA {
     fn initial_state(&self) -> usize {
         self.initial_state
@@ -49,7 +49,7 @@ impl<'a> NFA<'_, usize> for SetNFA {
 }
 
 impl SetNFA {
-    // usizehis function assumes that the regex is in a particular form, as transformed in
+    // This function assumes that the regex is in a particular form, as transformed in
     // regular_expression/.
     pub fn from_regex(regex_list: &[Vec<char>]) -> (impl NFA<usize>, Vec<usize>) {
         // For NFA.
@@ -67,6 +67,8 @@ impl SetNFA {
             final_states,
         };
 
+
+        // TODO: Do not allow regex that accept empty string!:
         let mut final_states: Vec<usize> = Default::default();
 
         // Reserve state 0 for first state.

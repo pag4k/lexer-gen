@@ -1,6 +1,6 @@
 [package]
-name = "lexer-gen"
-version = "0.1.0"
+name = "lexer_gen"
+version = "0.1.2"
 authors = ["Pierre-Andre Gagnon <pagagnon@gmail.com>"]
 edition = "2018"
 

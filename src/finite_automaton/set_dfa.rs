@@ -50,10 +50,7 @@ impl SetDFA {
     ///
     /// Since multiple NFA states correspond to a single DFA state, the NFA states will be sorted
     /// to make sure the comparisons are done properly.
-    pub fn from_nfa<'a>(
-        nfa: impl NFA<'a, usize>,
-        _alphabet: &[char],
-    ) -> (Self, BTreeMap<BTreeSet<usize>, usize>) {
+    pub fn from_nfa<'a>(nfa: impl NFA<'a, usize>) -> (Self, BTreeMap<BTreeSet<usize>, usize>) {
         let mut nfa_to_dfa_states_map: BTreeMap<Vec<usize>, usize> = BTreeMap::new();
         let mut marked_states: BTreeMap<usize, bool> = BTreeMap::new();
         let mut function: BTreeMap<(usize, char), usize> = BTreeMap::new();
@@ -117,14 +114,14 @@ impl SetDFA {
                 .iter()
                 .filter(|&&state| nfa.is_final_state(state))
                 .count();
-            /*
+
             if final_states_count > 1 {
-                unreachable!(
-                    "A DFA state has to correspond to at most one NFA final states: {}.",
+                println!(
+                    "Warning: A DFA final state corresponds to {} distinct tokens.",
                     final_states_count
                 );
             }
-            */
+
             // If there is more than one final state, take the first.
             // FIXME: It works, but it is the last token that it kept which is weird.
             if let Some(&state_id) = current_states
@@ -160,12 +157,13 @@ impl SetDFA {
     pub fn remove_trap(&mut self) {
         // Assume there is only one trap state.
         let trap_states = get_trap_states(self);
-        assert!(trap_states.len() == 1);
-        let trap_state = trap_states.into_iter().next().unwrap();
-        self.states.remove(&trap_state);
-        for (pair, to) in self.function.clone() {
-            if to == trap_state {
-                self.function.remove(&pair);
+        assert!(trap_states.len() <= 1);
+        if let Some(trap_state) = trap_states.into_iter().next() {
+            self.states.remove(&trap_state);
+            for (pair, to) in self.function.clone() {
+                if to == trap_state {
+                    self.function.remove(&pair);
+                }
             }
         }
     }
@@ -307,7 +305,7 @@ impl SetDFA {
 
     pub fn hopcroft_plus<'a>(
         dfa: &impl DFA<'a, usize>,
-        final_states: &Vec<BTreeSet<usize>>,
+        final_states: &[BTreeSet<usize>],
     ) -> (Self, BTreeMap<BTreeSet<usize>, usize>) {
         let old_states: Vec<usize> = dfa.states().collect();
         //let final_states: BTreeSet<usize> = dfa.final_states().collect();
@@ -321,7 +319,7 @@ impl SetDFA {
         //   dbg!(&final_states);
         //  dbg!(&non_final_states);
         // P is the partition.
-        let mut p = final_states.clone();
+        let mut p = final_states.to_vec();
         p.push(non_final_states);
         // W is the set to try to partition.
         let mut w = p.clone();

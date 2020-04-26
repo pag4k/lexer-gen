@@ -3,9 +3,9 @@
 extern crate alloc;
 
 use crate::finite_automaton::*;
-use crate::test::*;
-use alloc::collections::btree_map::{BTreeMap, Entry};
+use alloc::collections::btree_map::BTreeMap;
 use alloc::vec::Vec;
+use core::fmt::Display;
 
 /// DotGraph ADT
 pub struct DotGraph {
@@ -97,7 +97,7 @@ impl DotGraph {
     }
     pub fn from_dfa<'a>(
         dfa: &impl DFA<'a, usize>,
-        final_states_to_token: &BTreeMap<usize, TokenType>,
+        final_states_to_token: &BTreeMap<usize, impl Display>,
         backtrack_states: &[usize],
     ) -> DotGraph {
         let states: Vec<usize> = dfa.states().collect();

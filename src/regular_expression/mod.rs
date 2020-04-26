@@ -8,7 +8,7 @@ pub const ESCAPE_CHAR: [char; 10] = ['*', '+', '?', '|', '^', '⋅', '(', ')', '
 
 const CONCAT_CHAR: char = '⋅';
 const NOT_AFTER: [char; 2] = ['(', '|'];
-const NOT_BEFORE: [char; 4] = ['*', '?', '|', ')'];
+const NOT_BEFORE: [char; 5] = ['*', '+', '?', '|', ')'];
 
 // In increasing order of precedence.
 const OPERATORS: [char; 4] = ['|', CONCAT_CHAR, '?', '*'];

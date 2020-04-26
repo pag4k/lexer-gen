@@ -1,7 +1,7 @@
 extern crate alloc;
 
 pub mod dot_generator;
-mod finite_automaton;
+pub mod finite_automaton;
 mod regular_expression;
 
 use alloc::collections::btree_set::BTreeSet;

@@ -13,7 +13,7 @@ pub struct SetNFA {
 }
 
 // TODO: Not sure I understand these lifetime.
-impl<'a> NFA<'_, usize> for SetNFA {
+impl NFA<usize> for SetNFA {
     fn initial_state(&self) -> usize {
         self.initial_state
     }
@@ -216,7 +216,7 @@ impl SetNFA {
     }
 }
 
-pub fn get_epsilon_closure<'a>(nfa: &impl NFA<'a, usize>) -> BTreeMap<usize, Vec<usize>> {
+pub fn get_epsilon_closure(nfa: &impl NFA<usize>) -> BTreeMap<usize, Vec<usize>> {
     let mut epsilon_closure: BTreeMap<usize, Vec<usize>> = BTreeMap::new();
     let nfa_states: Vec<usize> = nfa.states().collect();
     for &state in &nfa_states {

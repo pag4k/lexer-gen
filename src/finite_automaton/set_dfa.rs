@@ -14,7 +14,7 @@ pub struct SetDFA {
 }
 
 // TODO: Not sure I understand these lifetime.
-impl<'a> DFA<'_, usize> for SetDFA {
+impl DFA<usize> for SetDFA {
     fn initial_state(&self) -> usize {
         self.initial_state
     }
@@ -50,7 +50,7 @@ impl SetDFA {
     ///
     /// Since multiple NFA states correspond to a single DFA state, the NFA states will be sorted
     /// to make sure the comparisons are done properly.
-    pub fn from_nfa<'a>(nfa: impl NFA<'a, usize>) -> (Self, BTreeMap<BTreeSet<usize>, usize>) {
+    pub fn from_nfa(nfa: impl NFA<usize>) -> (Self, BTreeMap<BTreeSet<usize>, usize>) {
         let mut nfa_to_dfa_states_map: BTreeMap<Vec<usize>, usize> = BTreeMap::new();
         let mut marked_states: BTreeMap<usize, bool> = BTreeMap::new();
         let mut function: BTreeMap<(usize, char), usize> = BTreeMap::new();
@@ -169,7 +169,7 @@ impl SetDFA {
     }
 
     pub fn hopcroft<'a>(
-        dfa: &impl DFA<'a, usize>,
+        dfa: &impl DFA<usize>,
         merge_final_states: bool,
     ) -> (Self, BTreeMap<BTreeSet<usize>, usize>) {
         let old_states: Vec<usize> = dfa.states().collect();
@@ -304,7 +304,7 @@ impl SetDFA {
     }
 
     pub fn hopcroft_plus<'a>(
-        dfa: &impl DFA<'a, usize>,
+        dfa: &impl DFA<usize>,
         final_states: &[BTreeSet<usize>],
     ) -> (Self, BTreeMap<BTreeSet<usize>, usize>) {
         let old_states: Vec<usize> = dfa.states().collect();
@@ -427,7 +427,7 @@ impl SetDFA {
     }
 }
 
-pub fn get_trap_states<'a, T>(dfa: &impl DFA<'a, T>) -> Vec<T>
+pub fn get_trap_states<T>(dfa: &impl DFA<T>) -> Vec<T>
 where
     T: core::cmp::Eq + core::marker::Copy,
 {
@@ -444,7 +444,7 @@ where
         .collect()
 }
 
-pub fn get_backtrack_states<'a, T>(dfa: &impl DFA<'a, T>) -> Vec<T>
+pub fn get_backtrack_states<T>(dfa: &impl DFA<T>) -> Vec<T>
 where
     T: core::marker::Copy,
 {

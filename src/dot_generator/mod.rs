@@ -15,7 +15,7 @@ pub struct DotGraph {
 impl DotGraph {
     /// Generate a .gv file based on the section of NFA specified in arguments.
     pub fn from_nfa<'a>(
-        nfa: &impl NFA<'a, usize>,
+        nfa: &impl NFA<usize>,
         //tokens: &HashMap<usize, TokenType>,
         //backtrack: &HashSet<usize>,
         //(first_state, last_state): (usize, usize),
@@ -96,7 +96,7 @@ impl DotGraph {
         dot_graph
     }
     pub fn from_dfa<'a>(
-        dfa: &impl DFA<'a, usize>,
+        dfa: &impl DFA<usize>,
         final_states_to_token: &BTreeMap<usize, impl Display>,
         backtrack_states: &[usize],
     ) -> DotGraph {

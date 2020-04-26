@@ -1,4 +1,4 @@
-pub trait NFA<'a, T> {
+pub trait NFA<T> {
     fn initial_state(&self) -> T;
     fn final_states(&self) -> Box<dyn Iterator<Item = T>>;
     fn is_final_state(&self, state: T) -> bool;

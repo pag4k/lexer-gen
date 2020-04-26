@@ -10,7 +10,7 @@ use alloc::vec::Vec;
 pub fn generate_lexer(
     source: Vec<&'static str>,
 ) -> (
-    impl finite_automaton::DFA<usize>,
+    finite_automaton::SetDFA,
     Vec<Vec<usize>>,
     Vec<usize>,
 ) {

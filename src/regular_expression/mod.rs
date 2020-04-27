@@ -27,14 +27,27 @@ pub fn regex<T: AsRef<[char]>>(input: T) -> Vec<char> {
 // FIXME: Assume there are no escape char in classes.
 fn replace_classes<T: AsRef<[char]>>(input: T) -> Vec<char> {
     let mut output = Vec::from(input.as_ref());
-    while let Some(left_position) = output.iter().position(|&c| c == '[') {
-        if let Some(right_position) = output.iter().position(|&c| c == ']') {
+    dbg!(&output);
+    let mut last_position = 0;
+    while let Some(left_position) = output.iter().skip(last_position).position(|&c| c == '[') {
+        let left_position = last_position + left_position;
+        dbg!(&left_position);
+        last_position = left_position + 1;
+        if left_position != 0 && output[left_position - 1] == '\\' {
+            continue;
+        }
+        while let Some(right_position) = output.iter().skip(left_position).position(|&c| c == ']') {
+            let right_position = left_position + right_position;
+            dbg!(&right_position);
+            if right_position != 0 && output[right_position - 1] == '\\' {
+                continue;
+            }
             let mut class: CharacterClass = Default::default();
             let mut position = left_position + 1;
             let negated = output[position] == '^';
             position += if negated { 1 } else { 0 };
             while position < right_position {
-                //println!("Char {}", output[position]);
+                println!("Char {}", output[position]);
                 if position + 2 < right_position && output[position + 1] == '-' {
                     let start_char = output[position];
                     let end_char = output[position + 2];
@@ -84,15 +97,16 @@ fn replace_classes<T: AsRef<[char]>>(input: T) -> Vec<char> {
                 substring.push(')');
             }
             output.splice(left_position..=right_position, substring.into_iter());
-        //output = output.replace(
-        //    output.get(left_position..=right_position).unwrap(),
-        //    &String::from_iter(substring),
-        //);
-        } else {
+            //output = output.replace(
+            //    output.get(left_position..=right_position).unwrap(),
+            //    &String::from_iter(substring),
+            //);
+            //} else {
             //panic!("ERROR: Brackets should some in pairs.");
+            break;
         }
     }
-    //dbg!(output.clone().into_iter().collect::<String>());
+    dbg!(output.clone().into_iter().collect::<String>());
     output
 }
 
@@ -124,7 +138,7 @@ fn add_explicit_concat<T: AsRef<[char]>>(input: T) -> Vec<char> {
         }
     }
 
-    //dbg!(new_regex.clone().into_iter().collect::<String>());
+    dbg!(new_regex.clone().into_iter().collect::<String>());
     new_regex
 }
 
@@ -185,7 +199,7 @@ fn to_postfix<T: AsRef<[char]>>(input: T) -> Vec<char> {
     operator_stack.sort_by_cached_key(|a| OPERATORS.iter().find(|c| a == *c).unwrap());
     new_regex.append(&mut operator_stack);
 
-    //dbg!(new_regex.clone().into_iter().collect::<String>());
+    dbg!(new_regex.clone().into_iter().collect::<String>());
     new_regex
 }
 

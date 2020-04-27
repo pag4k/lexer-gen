@@ -1,4 +1,3 @@
-
 use std::fmt::{Display, Formatter};
 
 // Define the all the arrays of char describing the language.
@@ -100,7 +99,10 @@ pub fn get_small_language() -> Vec<(&'static str, TokenType)> {
 pub fn get_language() -> Vec<(&'static str, TokenType)> {
     vec![
         ("([1-9][0-9]*)|0", TokenType::IntNum),
-        //("(([1-9][0-9]*)|0).(([0-9]*[1-9])|0)((e(+|-)?)(([1-9][0-9]*)|0))?", TokenType::floatNum),
+        (
+            "(([1-9][0-9]*)|0).(([0-9]*[1-9])|0)((e(\\+|-)?)(([1-9][0-9]*)|0))?",
+            TokenType::FloatNum,
+        ),
         ("==", TokenType::Operator(OperatorType::Eq)),
         ("<>", TokenType::Operator(OperatorType::NEq)),
         ("<", TokenType::Operator(OperatorType::LT)),
@@ -108,9 +110,9 @@ pub fn get_language() -> Vec<(&'static str, TokenType)> {
         ("<=", TokenType::Operator(OperatorType::LEq)),
         (">=", TokenType::Operator(OperatorType::GEq)),
         ("::", TokenType::Operator(OperatorType::SR)),
-        //("+", TokenType::Operator(OperatorType::Addition)),
+        ("\\+", TokenType::Operator(OperatorType::Addition)),
         ("-", TokenType::Operator(OperatorType::Subtraction)),
-        //("*", TokenType::Operator(OperatorType::Multiplication)),
+        ("\\*", TokenType::Operator(OperatorType::Multiplication)),
         ("/", TokenType::Operator(OperatorType::Division)),
         ("=", TokenType::Operator(OperatorType::Assignment)),
         ("and", TokenType::Operator(OperatorType::And)),
@@ -120,23 +122,29 @@ pub fn get_language() -> Vec<(&'static str, TokenType)> {
         (",", TokenType::Separator(SeparatorType::Coma)),
         (".", TokenType::Separator(SeparatorType::Period)),
         (":", TokenType::Separator(SeparatorType::Colon)),
-        //("(", TokenType::Separator(SeparatorType::LeftParenthesis)),
-        //)")", TokenType::Separator(SeparatorType::RightParenthesis)),
+        ("\\(", TokenType::Separator(SeparatorType::LeftParenthesis)),
+        ("\\)", TokenType::Separator(SeparatorType::RightParenthesis)),
         ("{", TokenType::Separator(SeparatorType::LeftCurlyBracket)),
         ("}", TokenType::Separator(SeparatorType::RightCurlyBracket)),
-        //("[", TokenType::Separator(SeparatorType::LeftSquareBracket)),
-        //("]", TokenType::Separator(SeparatorType::RightSquareBracket)),
-        //("if", TokenType::Keyword(KeywordType::If)),
-        //("then", TokenType::Keyword(KeywordType::Then)),
-        //("else", TokenType::Keyword(KeywordType::Else)),
-        //("for", TokenType::Keyword(KeywordType::For)),
-        //("class", TokenType::Keyword(KeywordType::Class)),
-        //("int", TokenType::Keyword(KeywordType::Integer)),
-        //("float", TokenType::Keyword(KeywordType::Float)),
-        //("get", TokenType::Keyword(KeywordType::Read)),
-        //("put", TokenType::Keyword(KeywordType::Write)),
-        //("return", TokenType::Keyword(KeywordType::Return)),
-        //("program", TokenType::Keyword(KeywordType::Main)),
+        (
+            "\\[",
+            TokenType::Separator(SeparatorType::LeftSquareBracket),
+        ),
+        (
+            "\\]",
+            TokenType::Separator(SeparatorType::RightSquareBracket),
+        ),
+        ("if", TokenType::Keyword(KeywordType::If)),
+        ("then", TokenType::Keyword(KeywordType::Then)),
+        ("else", TokenType::Keyword(KeywordType::Else)),
+        ("for", TokenType::Keyword(KeywordType::For)),
+        ("class", TokenType::Keyword(KeywordType::Class)),
+        ("int", TokenType::Keyword(KeywordType::Integer)),
+        ("float", TokenType::Keyword(KeywordType::Float)),
+        ("get", TokenType::Keyword(KeywordType::Read)),
+        ("put", TokenType::Keyword(KeywordType::Write)),
+        ("return", TokenType::Keyword(KeywordType::Return)),
+        ("main", TokenType::Keyword(KeywordType::Main)),
         ("[a-zA-Z][a-zA-Z0-9]*", TokenType::Id),
     ]
 }

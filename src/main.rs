@@ -18,7 +18,7 @@ pub const SIGMA: [char; 87] = [
 
 fn main() {
     let language = test::get_language();
-    let strings: Vec<&'static str>= language.iter().map(|(string, _)| *string).collect();
+    let strings: Vec<&'static str> = language.iter().map(|(string, _)| *string).collect();
     let (dfa, final_states, backtrack_states) = lexer_gen::generate_lexer(strings);
     let mut final_states_to_token: BTreeMap<usize, test::TokenType> = Default::default();
     for (i, states) in final_states.into_iter().enumerate() {
@@ -26,13 +26,16 @@ fn main() {
             final_states_to_token.insert(state, language[i].1);
         }
     }
-    let dot_graph =
-        lexer_gen::dot_generator::DotGraph::from_dfa(&dfa, &final_states_to_token, &backtrack_states);
+    let dot_graph = lexer_gen::dot_generator::DotGraph::from_dfa(
+        &dfa,
+        &final_states_to_token,
+        &backtrack_states,
+    );
     let mut file = File::create("dfa_no_trap.dot").unwrap();
     file.write_all(&dot_graph.code).unwrap();
 }
 
-/* 
+/*
     let regex = language
         .iter()
         .map(|&(string, _)| {

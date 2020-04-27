@@ -157,7 +157,7 @@ impl SetDFA {
     pub fn remove_trap(&mut self) {
         // Assume there is only one trap state.
         let trap_states = get_trap_states(self);
-        assert!(trap_states.len() <= 1);
+        //assert!(trap_states.len() <= 1);
         if let Some(trap_state) = trap_states.into_iter().next() {
             self.states.remove(&trap_state);
             for (pair, to) in self.function.clone() {

@@ -14,7 +14,7 @@ pub struct DotGraph {
 
 impl DotGraph {
     /// Generate a .gv file based on the section of NFA specified in arguments.
-    pub fn from_nfa<'a>(
+    pub fn from_nfa(
         nfa: &impl NFA<usize>,
         //tokens: &HashMap<usize, TokenType>,
         //backtrack: &HashSet<usize>,
@@ -95,7 +95,7 @@ impl DotGraph {
 
         dot_graph
     }
-    pub fn from_dfa<'a>(
+    pub fn from_dfa(
         dfa: &impl DFA<usize>,
         final_states_to_token: &BTreeMap<usize, impl Display>,
         backtrack_states: &[usize],
@@ -159,7 +159,8 @@ impl DotGraph {
                     "\t{}\t->\t{}\t[ label = \"{}\" ];",
                     from,
                     to,
-                    inputs.into_iter().collect::<String>()
+                    // TODO: Include the to_escape here.
+                    combine_inputs(&inputs)
                 );
                 dot_graph.add_line(&line);
             }
@@ -175,77 +176,102 @@ impl DotGraph {
 
         dot_graph
     }
-    /*
-        pub fn from_dfa2(dfa: &DFA2) -> DotGraph {
-            let mut dot_graph = DotGraph { code: Vec::new() };
-            dot_graph.add_line("digraph finite_state_machine {");
-            dot_graph.add_line("\trankdir=LR;");
-            dot_graph.add_line("\tsize=\"8,5\"");
 
-            dot_graph.add_line("");
+    pub fn from_dfa2(dfa: &dyn DFA<usize>) -> DotGraph {
+        let mut dot_graph = DotGraph { code: Vec::new() };
+        let states: Vec<usize> = dfa.states().collect();
+        let alphabet: Vec<char> = dfa.alphabet().collect();
+        dot_graph.add_line("digraph finite_state_machine {");
+        dot_graph.add_line("\trankdir=LR;");
+        dot_graph.add_line("\tsize=\"8,5\"");
 
-            for state in dfa
-                .states
-                .iter()
-                .rev()
-                .filter(|state| dfa.final_states.contains(&state))
-            {
-                let line = format!(
-                    "\tnode [shape = rectangle, label=\"{} -> {}\", fontsize=12] token{};",
-                    state, state, state
-                );
-                dot_graph.add_line(&line);
-            }
+        dot_graph.add_line("");
 
-            dot_graph.add_line("");
-
-            for state in dfa.states.iter() {
-                let node = if dfa.final_states.contains(&state) {
-                    "doublecircle"
-                } else {
-                    "circle"
-                };
-                let color = "black";
-                //  if backtrack.contains(&state) {
-                //     "red"
-                // } else {
-                //     "black"
-                // };
-                let line = format!(
-                    "\tnode [shape = {}, label=\"{}\", fontsize=12, color={}] {};",
-                    node, state, color, state
-                );
-                dot_graph.add_line(&line);
-            }
-
-            dot_graph.add_line("");
-
-            let line = "\tnode [shape = point, color=black] q0;";
+        for state in dfa.states().filter(|state| dfa.is_final_state(*state)) {
+            let line = format!(
+                "\tnode [shape = rectangle, label=\"{} -> {}\", fontsize=12] token{};",
+                state, state, state
+            );
             dot_graph.add_line(&line);
-            let line = format!("\tq0\t->\t{};", dfa.initial_state);
+        }
+
+        dot_graph.add_line("");
+
+        for state in dfa.states() {
+            let node = if dfa.is_final_state(state) {
+                "doublecircle"
+            } else {
+                "circle"
+            };
+            let color = "black";
+            //  if backtrack.contains(&state) {
+            //     "red"
+            // } else {
+            //     "black"
+            // };
+            let line = format!(
+                "\tnode [shape = {}, label=\"{}\", fontsize=12, color={}] {};",
+                node, state, color, state
+            );
             dot_graph.add_line(&line);
+        }
 
-            dot_graph.add_line("");
+        dot_graph.add_line("");
 
-            for ((from, to), set) in dfa.function.iter() {
+        let line = "\tnode [shape = point, color=black] q0;";
+        dot_graph.add_line(&line);
+        let line = format!("\tq0\t->\t{};", dfa.initial_state());
+        dot_graph.add_line(&line);
+
+        dot_graph.add_line("");
+
+        for &from in &states {
+            let mut transitions: BTreeMap<usize, Vec<char>> = Default::default();
+            for &input in &alphabet {
+                if let Some(to) = dfa.next(from, input) {
+                    transitions.entry(to).or_default().push(input);
+                }
+            }
+            for (to, inputs) in transitions {
                 let line = format!(
                     "\t{}\t->\t{}\t[ label = \"{}\" ];",
                     from,
                     to,
-                    to_character_class(set.clone().into_iter().collect::<Vec<char>>())
+                    // TODO: Include the to_escape here.
+                    combine_inputs(&inputs)
                 );
-                //dbg!(&line);
                 dot_graph.add_line(&line);
             }
-            dot_graph.add_line("}");
-
-            dot_graph
         }
 
-    */
+        dot_graph.add_line("}");
+
+        dot_graph
+    }
+
     /// Helper function to add a line to the output String.
     fn add_line(&mut self, line: &str) {
         self.code.extend(line.as_bytes());
         self.code.push(b'\n');
     }
+}
+
+fn to_escape(char: char) -> String {
+    match char as u8 {
+        9 => String::from("\\t"),
+        10 => String::from("\\n"),
+        12 => String::from("\\f"),
+        13 => String::from("\\r"),
+        34 => String::from("\\\""),
+        _ => String::from_utf8(vec![char as u8]).unwrap(),
+    }
+}
+
+// FIXME: This works, but it break the dot file with all the symbols.
+fn combine_inputs(inputs: &[char]) -> String {
+    let mut string: String = Default::default();
+    for &char in inputs {
+        string.push_str(&to_escape(char));
+    }
+    string
 }

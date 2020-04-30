@@ -158,7 +158,7 @@ impl SetDFA {
         // Assume there is only one trap state.
         let trap_states = get_trap_states(self);
         //assert!(trap_states.len() <= 1);
-        if let Some(trap_state) = trap_states.into_iter().next() {
+        for trap_state in trap_states {
             self.states.remove(&trap_state);
             for (pair, to) in self.function.clone() {
                 if to == trap_state {
@@ -433,13 +433,14 @@ where
 {
     dfa.states()
         .filter(|&from| {
-            dfa.alphabet().any(|input| {
-                if let Some(to) = dfa.next(from, input) {
-                    !(from != to || dfa.is_final_state(to))
-                } else {
-                    false
-                }
-            })
+            !dfa.is_final_state(from)
+                && dfa.alphabet().all(|input| {
+                    if let Some(to) = dfa.next(from, input) {
+                        from == to
+                    } else {
+                        true
+                    }
+                })
         })
         .collect()
 }

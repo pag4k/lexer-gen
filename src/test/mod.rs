@@ -134,6 +134,11 @@ pub fn get_language() -> Vec<(&'static str, TokenType)> {
             "\\]",
             TokenType::Separator(SeparatorType::RightSquareBracket),
         ),
+        ("//[^\n]*\n", TokenType::Comment(CommentType::LineComment)),
+        (
+            "/\\*([^\\*]*|(\\*+[^/]))\\*+/",
+            TokenType::Comment(CommentType::BlockComment),
+        ),
         ("if", TokenType::Keyword(KeywordType::If)),
         ("then", TokenType::Keyword(KeywordType::Then)),
         ("else", TokenType::Keyword(KeywordType::Else)),

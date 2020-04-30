@@ -10,6 +10,7 @@ const CHAR_SETS: [RangeInclusive<u8>; 3] = [
 const FF: [usize; 2] = [6, 6];
 */
 
+/*
 pub struct CharacterClass {
     bits: u64,
 }
@@ -62,19 +63,28 @@ impl CharacterClass {
         self.bits = !self.bits;
     }
 }
+*/
 
-/*
-pub struct CharacterClass128 {
+// This class do not support all 128 ASCII char.
+// It includes whitespace: 9, A, C, D, 20
+// And printable ASCII: 20-7E
+//const whitespace: [u8; 5] = [0x9, 0xA, 0xC, 0xD, 0x20];
+//const printable: core::ops::RangeInclusive<u8> = 0x20..=0x7E;
+const VALID_MASK: u128 = 0b01111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111100000000000000000011011000000000;
+// This was the version in the other order:
+// 0b00000000011011000000000000000000111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111110;
+
+pub struct AsciiCharacterClass {
     bits: u128,
 }
 
-impl Default for CharacterClass128 {
+impl Default for AsciiCharacterClass {
     fn default() -> Self {
-        CharacterClass128 { bits: 0 }
+        AsciiCharacterClass { bits: 0 }
     }
 }
 
-impl CharacterClass128 {
+impl AsciiCharacterClass {
     fn to_shift(char: char) -> u8 {
         char as u8
     }
@@ -99,7 +109,11 @@ impl CharacterClass128 {
     }
 
     pub fn add(&mut self, char: char) {
-        self.bits ^= (1 as u128) << Self::to_shift(char);
+        let bit: u128 = (1 as u128) << Self::to_shift(char);
+        if bit & VALID_MASK != 0 {
+            assert_ne!(bit & VALID_MASK, 0);
+            self.bits ^= bit;
+        }
     }
 
     pub fn add_slice(&mut self, chars: &[char]) {
@@ -107,10 +121,9 @@ impl CharacterClass128 {
     }
 
     pub fn negate(&mut self) {
-        self.bits = !self.bits;
+        self.bits = !self.bits & VALID_MASK;
     }
 }
-*/
 
 /*
 pub fn to_character_class<T: AsRef<[char]>>(set: T) -> String {

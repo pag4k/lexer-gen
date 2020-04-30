@@ -6,20 +6,22 @@ mod regular_expression;
 
 use alloc::collections::btree_set::BTreeSet;
 use alloc::vec::Vec;
+use std::fs::File;
+use std::io::prelude::*;
 
 pub fn generate_lexer(
     source: Vec<&'static str>,
-) -> (
-    finite_automaton::SetDFA,
-    Vec<Vec<usize>>,
-    Vec<usize>,
-) {
+) -> (finite_automaton::SetDFA, Vec<Vec<usize>>, Vec<usize>) {
     let regex = source
         .iter()
         .map(|&string| regular_expression::regex(string.chars().collect::<Vec<char>>()))
         .collect::<Vec<Vec<char>>>();
     let (nfa, final_states) = finite_automaton::set_nfa::SetNFA::from_regex(&regex);
+    let dot_graph = dot_generator::DotGraph::from_nfa(&nfa);
+    let mut file = File::create("nfa.dot").unwrap();
+    file.write_all(&dot_graph.code).unwrap();
     let (dfa, nfa_to_dfa_map) = finite_automaton::set_dfa::SetDFA::from_nfa(nfa);
+    //dbg!(&nfa_to_dfa_map);
     let final_states2: Vec<BTreeSet<usize>> = final_states
         .into_iter()
         .map(|nfa_state| {
@@ -51,6 +53,10 @@ pub fn generate_lexer(
     }
     let final_states2 = dedup_final_states;
     //dbg!(&final_states2);
+
+    /*let dot_graph = dot_generator::DotGraph::from_dfa2(&dfa);
+    let mut file = File::create("dfa.dot").unwrap();
+    file.write_all(&dot_graph.code).unwrap();*/
     let (dfa, dfa_to_hopcroft_map) = finite_automaton::set_dfa::SetDFA::hopcroft(&dfa, false);
     let final_states3: Vec<BTreeSet<usize>> = final_states2
         .into_iter()

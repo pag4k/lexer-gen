@@ -4,7 +4,8 @@ pub mod character_class;
 use alloc::vec::Vec;
 use character_class::*;
 
-pub const ESCAPE_CHAR: [char; 10] = ['*', '+', '?', '|', '^', '⋅', '(', ')', '[', ']'];
+// Potential other ESCAPE_CHAR: {}$.\
+pub const ESCAPE_CHAR: [char; 11] = ['*', '+', '?', '|', '^', '⋅', '(', ')', '[', ']', '\\'];
 
 const CONCAT_CHAR: char = '⋅';
 const NOT_AFTER: [char; 2] = ['(', '|'];
@@ -15,8 +16,6 @@ const OPERATORS: [char; 4] = ['|', CONCAT_CHAR, '?', '*'];
 const PARENTHESIS: [char; 2] = ['(', ')'];
 
 // TODO: Need some function to check validity.
-// TODO: Change + to *.
-// TODO: Replace ?.
 
 pub fn regex<T: AsRef<[char]>>(input: T) -> Vec<char> {
     to_postfix(&add_explicit_concat(&replace_classes(&Vec::from(
@@ -32,6 +31,7 @@ fn replace_classes<T: AsRef<[char]>>(input: T) -> Vec<char> {
     while let Some(left_position) = output.iter().skip(last_position).position(|&c| c == '[') {
         let left_position = last_position + left_position;
         dbg!(&left_position);
+        // FIXME: Probably a better way to handle this increase.
         last_position = left_position + 1;
         if left_position != 0 && output[left_position - 1] == '\\' {
             continue;
@@ -42,40 +42,67 @@ fn replace_classes<T: AsRef<[char]>>(input: T) -> Vec<char> {
             if right_position != 0 && output[right_position - 1] == '\\' {
                 continue;
             }
-            let mut class: CharacterClass = Default::default();
+            let mut class: AsciiCharacterClass = Default::default();
             let mut position = left_position + 1;
             let negated = output[position] == '^';
             position += if negated { 1 } else { 0 };
             while position < right_position {
-                println!("Char {}", output[position]);
-                if position + 2 < right_position && output[position + 1] == '-' {
-                    let start_char = output[position];
-                    let end_char = output[position + 2];
-                    if (end_char as u8) < (start_char as u8) {
-                        // FIXME: Find a better way to propagate this error.
-                        println!("ERROR '{}-{}': Range values reversed. Start char code is greater than end char code.", start_char, end_char);
-                        // TODO: Not sure if I just want to take the last char.
-                        class.add(end_char);
-                    } else if (start_char.is_numeric() && end_char.is_numeric())
-                        || (start_char.is_lowercase() && end_char.is_lowercase())
-                        || (start_char.is_uppercase() && end_char.is_uppercase())
-                    {
-                        let chars: Vec<char> = ((start_char as u8)..=(end_char as u8))
-                            .map(|char| char as char)
-                            .collect();
-                        class.add_slice(&chars);
-                    } else {
-                        // FIXME: Not sure if I want this to be an error.
-                        println!(
-                            "ERROR '{}-{}': Characters of different type..",
-                            start_char, end_char
-                        );
-                    };
+                println!("Char {} at {}", output[position], position);
+
+                let (start_char, end_char) = if position + 4 < right_position
+                    && output[position] == '\\'
+                    && output[position + 2] == '-'
+                    && output[position + 3] == '\\'
+                {
+                    position += 5;
+                    (output[position - 5 + 1], output[position - 5 + 4])
+                } else if position + 3 < right_position
+                    && output[position] == '\\'
+                    && output[position + 2] == '-'
+                    && output[position + 3] != '\\'
+                {
+                    position += 4;
+                    (output[position - 4 + 1], output[position - 4 + 3])
+                } else if position + 3 < right_position
+                    && output[position] != '\\'
+                    && output[position + 1] == '-'
+                    && output[position + 2] == '\\'
+                {
+                    position += 4;
+                    (output[position - 4], output[position - 4 + 3])
+                } else if position + 2 < right_position
+                    && output[position] != '\\'
+                    && output[position + 1] == '-'
+                    && output[position + 2] != '\\'
+                {
                     position += 3;
-                } else {
+                    (output[position - 3], output[position - 3 + 2])
+                } else if position + 1 < right_position && output[position] == '\\' {
+                    class.add(output[position + 1]);
+                    position += 2;
+                    continue;
+                } else if position < right_position && output[position] != '\\' {
                     class.add(output[position]);
                     position += 1;
-                }
+                    continue;
+                } else {
+                    panic!(
+                        "Unsupported pattern starting at: {:?}.",
+                        &output[position..]
+                    );
+                };
+
+                if (end_char as u8) < (start_char as u8) {
+                    // FIXME: Find a better way to propagate this error.
+                    println!("ERROR '{}-{}': Range values reversed. Start char code is greater than end char code.", start_char, end_char);
+                    // TODO: Not sure if I just want to take the last char.
+                    class.add(end_char);
+                } else {
+                    let chars: Vec<char> = ((start_char as u8)..=(end_char as u8))
+                        .map(|char| char as char)
+                        .collect();
+                    class.add_slice(&chars);
+                };
             }
             let mut substring: Vec<char> = Vec::new();
             if negated {
@@ -90,6 +117,9 @@ fn replace_classes<T: AsRef<[char]>>(input: T) -> Vec<char> {
                 // .flatten()
                 //.collect();
                 for c in class.to_array() {
+                    if ESCAPE_CHAR.contains(&c) {
+                        substring.push('\\');
+                    }
                     substring.push(c);
                     substring.push('|');
                 }
@@ -97,6 +127,7 @@ fn replace_classes<T: AsRef<[char]>>(input: T) -> Vec<char> {
                 substring.push(')');
             }
             output.splice(left_position..=right_position, substring.into_iter());
+            //last_position = left_position + substring.len();
             //output = output.replace(
             //    output.get(left_position..=right_position).unwrap(),
             //    &String::from_iter(substring),
@@ -270,5 +301,13 @@ mod tests {
             replaced_range,
             "(4|5|8|Z|a|c|d|e)".chars().collect::<Vec<char>>()
         );
+    }
+
+    // FIXME: Fix the code to make this test work.
+    #[test]
+    fn negate() {
+        let range: Vec<char> = "[^\t-\\|]".chars().collect();
+        let after = to_postfix(&add_explicit_concat(&replace_classes(&range)));
+        assert_eq!(after, "}~|".chars().collect::<Vec<char>>());
     }
 }

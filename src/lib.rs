@@ -14,8 +14,13 @@ pub fn generate_lexer(
 ) -> (finite_automaton::SetDFA, Vec<Vec<usize>>, Vec<usize>) {
     let regex = source
         .iter()
-        .map(|&string| regular_expression::regex(string.chars().collect::<Vec<char>>()))
-        .collect::<Vec<Vec<char>>>();
+        .map(|&string| {
+            regular_expression::regex(string.chars().collect::<Vec<char>>())
+                .into_iter()
+                .map(|c| c as u8)
+                .collect()
+        })
+        .collect::<Vec<Vec<u8>>>();
     let (nfa, final_states) = finite_automaton::set_nfa::SetNFA::from_regex(&regex);
     let dot_graph = dot_generator::DotGraph::from_nfa(&nfa);
     let mut file = File::create("nfa.dot").unwrap();
@@ -57,25 +62,9 @@ pub fn generate_lexer(
     /*let dot_graph = dot_generator::DotGraph::from_dfa2(&dfa);
     let mut file = File::create("dfa.dot").unwrap();
     file.write_all(&dot_graph.code).unwrap();*/
-    let (dfa, dfa_to_hopcroft_map) = finite_automaton::set_dfa::SetDFA::hopcroft(&dfa, false);
-    let final_states3: Vec<BTreeSet<usize>> = final_states2
-        .into_iter()
-        .map(|final_dfa_states| {
-            dfa_to_hopcroft_map
-                .iter()
-                .filter_map(|(dfa_states, &hopcroft_state)| {
-                    if !final_dfa_states.is_disjoint(dfa_states) {
-                        Some(hopcroft_state)
-                    } else {
-                        None
-                    }
-                })
-                .collect()
-        })
-        .collect();
     let (mut dfa, dfa_to_hopcroft_map) =
-        finite_automaton::set_dfa::SetDFA::hopcroft_plus(&dfa, &final_states3);
-    let final_states: Vec<Vec<usize>> = final_states3
+        finite_automaton::set_dfa::SetDFA::hopcroft(&dfa, &final_states2);
+    let final_states: Vec<Vec<usize>> = final_states2
         .into_iter()
         .map(|final_dfa_states| {
             dfa_to_hopcroft_map

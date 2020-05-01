@@ -17,3 +17,6 @@ Cargo.lock
 
 *.dot
 *.png
+*.svg
+*.old
+*.data

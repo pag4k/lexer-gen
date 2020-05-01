@@ -5,8 +5,8 @@ use alloc::collections::btree_set::BTreeSet;
 /// NonDeterministicFiniteAccepter ADusize
 #[derive(Debug)]
 pub struct SetNFA {
-    pub alphabet: BTreeSet<char>,
-    pub function: BTreeMap<(usize, Option<char>), BTreeSet<usize>>,
+    pub alphabet: BTreeSet<u8>,
+    pub function: BTreeMap<(usize, Option<u8>), BTreeSet<usize>>,
     pub initial_state: usize,
     pub last_state: usize,
     pub final_states: BTreeSet<usize>,
@@ -31,7 +31,7 @@ impl NFA<usize> for SetNFA {
     }
 
     /// Return the next state based on a state and an input character.
-    fn next(&self, state: usize, input: Option<char>) -> Option<Box<dyn Iterator<Item = usize>>> {
+    fn next(&self, state: usize, input: Option<u8>) -> Option<Box<dyn Iterator<Item = usize>>> {
         // FIXME: Why does the map doesn't word?
         if let Some(states) = self.function.get(&(state, input))
         //.map(|states| Box::new(states.clone().into_iter()))
@@ -43,7 +43,7 @@ impl NFA<usize> for SetNFA {
         }
     }
 
-    fn alphabet(&self) -> Box<dyn Iterator<Item = char>> {
+    fn alphabet(&self) -> Box<dyn Iterator<Item = u8>> {
         Box::new(self.alphabet.clone().into_iter())
     }
 }
@@ -51,10 +51,10 @@ impl NFA<usize> for SetNFA {
 impl SetNFA {
     // This function assumes that the regex is in a particular form, as transformed in
     // regular_expression/.
-    pub fn from_regex(regex_list: &[Vec<char>]) -> (impl NFA<usize>, Vec<usize>) {
+    pub fn from_regex(regex_list: &[Vec<u8>]) -> (impl NFA<usize>, Vec<usize>) {
         // For NFA.
         let alphabet = BTreeSet::new();
-        let function: BTreeMap<(usize, Option<char>), BTreeSet<usize>> = BTreeMap::new();
+        let function: BTreeMap<(usize, Option<u8>), BTreeSet<usize>> = BTreeMap::new();
         let initial_state: usize = 0;
         let last_state: usize = 0;
         let final_states: BTreeSet<usize> = BTreeSet::new();
@@ -67,7 +67,6 @@ impl SetNFA {
             final_states,
         };
 
-
         // TODO: Do not allow regex that accept empty string!:
         let mut final_states: Vec<usize> = Default::default();
 
@@ -75,47 +74,51 @@ impl SetNFA {
         for regex in regex_list {
             let mut stack: Vec<(usize, usize)> = Vec::new();
             let mut escape_char = false;
-            for (i, c) in regex.iter().enumerate() {
+            for (i, byte) in regex.iter().enumerate() {
+                let c = *byte as char;
                 if escape_char {
                     escape_char = false;
-                    if crate::regular_expression::ESCAPE_CHAR.contains(c) {
-                        stack.push(nfa.add_symbol_subgraph(*c));
+                    if crate::regular_expression::ESCAPE_CHAR.contains(&c) {
+                        stack.push(nfa.add_symbol_subgraph(*byte));
                         continue;
                     } else {
-                        stack.push(nfa.add_symbol_subgraph('\\'));
+                        stack.push(nfa.add_symbol_subgraph('\\' as u8));
                     }
                 }
-                match c {
-                    '\\' => escape_char = true,
-                    '*' => {
+                match byte {
+                    92 => escape_char = true,
+                    42 => {
                         let sub_nfa = stack.pop().unwrap();
                         stack.push(nfa.add_kleene_star_subgraph(sub_nfa));
                     }
-                    '+' => {
+                    43 => {
                         let sub_nfa = stack.pop().unwrap();
                         stack.push(nfa.add_kleene_plus_subgraph(sub_nfa));
                     }
-                    '?' => {
+                    63 => {
                         let sub_nfa = stack.pop().unwrap();
                         stack.push(nfa.add_optional_subgraph(sub_nfa));
                     }
-                    '|' => {
+                    124 => {
                         let right_sub_nfa = stack.pop().unwrap();
                         let left_sub_nfa = stack.pop().unwrap();
                         stack.push(nfa.add_union_subgraph(left_sub_nfa, right_sub_nfa));
                     }
-                    '⋅' => {
+                    197 => {
                         if stack.len() < 2 {
                             panic!(
                                 "Stack does not have two elements: {}",
-                                regex[0..=i].iter().collect::<String>()
+                                regex[0..=i]
+                                    .iter()
+                                    .map(|&byte| byte as char)
+                                    .collect::<String>()
                             );
                         }
                         let right_sub_nfa = stack.pop().unwrap();
                         let left_sub_nfa = stack.pop().unwrap();
                         stack.push(nfa.add_concat_subgraph(left_sub_nfa, right_sub_nfa));
                     }
-                    _ => stack.push(nfa.add_symbol_subgraph(*c)),
+                    _ => stack.push(nfa.add_symbol_subgraph(*byte)),
                 }
             }
             final_states.push(nfa.last_state);
@@ -144,12 +147,12 @@ impl SetNFA {
         self.last_state
     }
 
-    fn add_symbol_subgraph(&mut self, c: char) -> (usize, usize) {
-        self.alphabet.insert(c);
+    fn add_symbol_subgraph(&mut self, byte: u8) -> (usize, usize) {
+        self.alphabet.insert(byte);
         let new_start = self.add_state();
         let new_end = self.add_state();
         self.function
-            .insert((new_start, Some(c)), [new_end].iter().cloned().collect());
+            .insert((new_start, Some(byte)), [new_end].iter().cloned().collect());
         (new_start, new_end)
     }
 

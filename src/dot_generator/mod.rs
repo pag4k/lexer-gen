@@ -21,7 +21,7 @@ impl DotGraph {
         //(first_state, last_state): (usize, usize),
     ) -> DotGraph {
         let states: Vec<usize> = nfa.states().collect();
-        let alphabet: Vec<char> = nfa.alphabet().collect();
+        let alphabet: Vec<u8> = nfa.alphabet().collect();
 
         let mut dot_graph = DotGraph { code: Vec::new() };
         dot_graph.add_line("digraph finite_state_machine {");
@@ -78,7 +78,8 @@ impl DotGraph {
             for &input in &alphabet {
                 if let Some(to_iter) = nfa.next(from, Some(input)) {
                     for to in to_iter {
-                        let line = format!("\t{}\t->\t{}\t[ label = \"{}\" ];", from, to, input);
+                        let line =
+                            format!("\t{}\t->\t{}\t[ label = \"{}\" ];", from, to, input as char);
                         dot_graph.add_line(&line);
                     }
                 }
@@ -101,7 +102,7 @@ impl DotGraph {
         backtrack_states: &[usize],
     ) -> DotGraph {
         let states: Vec<usize> = dfa.states().collect();
-        let alphabet: Vec<char> = dfa.alphabet().collect();
+        let alphabet: Vec<u8> = dfa.alphabet().collect();
 
         let mut dot_graph = DotGraph { code: Vec::new() };
         dot_graph.add_line("digraph finite_state_machine {");
@@ -148,7 +149,7 @@ impl DotGraph {
         dot_graph.add_line("");
 
         for &from in &states {
-            let mut transitions: BTreeMap<usize, Vec<char>> = Default::default();
+            let mut transitions: BTreeMap<usize, Vec<u8>> = Default::default();
             for &input in &alphabet {
                 if let Some(to) = dfa.next(from, input) {
                     transitions.entry(to).or_default().push(input);
@@ -180,7 +181,7 @@ impl DotGraph {
     pub fn from_dfa2(dfa: &dyn DFA<usize>) -> DotGraph {
         let mut dot_graph = DotGraph { code: Vec::new() };
         let states: Vec<usize> = dfa.states().collect();
-        let alphabet: Vec<char> = dfa.alphabet().collect();
+        let alphabet: Vec<u8> = dfa.alphabet().collect();
         dot_graph.add_line("digraph finite_state_machine {");
         dot_graph.add_line("\trankdir=LR;");
         dot_graph.add_line("\tsize=\"8,5\"");
@@ -226,7 +227,7 @@ impl DotGraph {
         dot_graph.add_line("");
 
         for &from in &states {
-            let mut transitions: BTreeMap<usize, Vec<char>> = Default::default();
+            let mut transitions: BTreeMap<usize, Vec<u8>> = Default::default();
             for &input in &alphabet {
                 if let Some(to) = dfa.next(from, input) {
                     transitions.entry(to).or_default().push(input);
@@ -256,22 +257,23 @@ impl DotGraph {
     }
 }
 
-fn to_escape(char: char) -> String {
-    match char as u8 {
+fn to_escape(byte: u8) -> String {
+    match byte {
         9 => String::from("\\t"),
         10 => String::from("\\n"),
         12 => String::from("\\f"),
         13 => String::from("\\r"),
         34 => String::from("\\\""),
-        _ => String::from_utf8(vec![char as u8]).unwrap(),
+        92 => String::from("\\\\"),
+        _ => (byte as char).to_string(),
     }
 }
 
 // FIXME: This works, but it break the dot file with all the symbols.
-fn combine_inputs(inputs: &[char]) -> String {
+fn combine_inputs(inputs: &[u8]) -> String {
     let mut string: String = Default::default();
-    for &char in inputs {
-        string.push_str(&to_escape(char));
+    for &byte in inputs {
+        string.push_str(&to_escape(byte));
     }
     string
 }

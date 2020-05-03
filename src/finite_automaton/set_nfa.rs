@@ -1,14 +1,14 @@
 use super::nfa::*;
-use alloc::collections::btree_map::BTreeMap;
+use alloc::collections::btree_map::{BTreeMap, Entry};
 use alloc::collections::btree_set::BTreeSet;
 
 /// NonDeterministicFiniteAccepter ADusize
 #[derive(Debug)]
 pub struct SetNFA {
-    pub alphabet: BTreeSet<u8>,
-    pub function: BTreeMap<(usize, Option<u8>), BTreeSet<usize>>,
+    pub alphabet: Vec<u8>,
+    pub function: BTreeMap<(usize, Option<u8>), Vec<usize>>,
     pub initial_state: usize,
-    pub last_state: usize,
+    pub states: Vec<usize>,
     pub final_states: BTreeSet<usize>,
 }
 
@@ -26,25 +26,20 @@ impl NFA<usize> for SetNFA {
         self.final_states.contains(&state)
     }
 
-    fn states(&self) -> Box<dyn Iterator<Item = usize>> {
-        Box::new(0..=self.last_state)
+    fn states(&self) -> &[usize] {
+        &self.states
     }
 
     /// Return the next state based on a state and an input character.
-    fn next(&self, state: usize, input: Option<u8>) -> Option<Box<dyn Iterator<Item = usize>>> {
+    fn next(&self, state: usize, input: Option<u8>) -> Option<&[usize]> {
         // FIXME: Why does the map doesn't word?
-        if let Some(states) = self.function.get(&(state, input))
-        //.map(|states| Box::new(states.clone().into_iter()))
-        {
-            let s: BTreeSet<usize> = states.clone();
-            Some(Box::new(s.into_iter()))
-        } else {
-            None
-        }
+        self.function
+            .get(&(state, input))
+            .map(|states| states.as_slice())
     }
 
-    fn alphabet(&self) -> Box<dyn Iterator<Item = u8>> {
-        Box::new(self.alphabet.clone().into_iter())
+    fn alphabet(&self) -> &[u8] {
+        &self.alphabet
     }
 }
 
@@ -53,17 +48,17 @@ impl SetNFA {
     // regular_expression/.
     pub fn from_regex(regex_list: &[Vec<u8>]) -> (impl NFA<usize>, Vec<usize>) {
         // For NFA.
-        let alphabet = BTreeSet::new();
-        let function: BTreeMap<(usize, Option<u8>), BTreeSet<usize>> = BTreeMap::new();
+        let alphabet: Vec<u8> = Default::default();
+        let function: BTreeMap<(usize, Option<u8>), Vec<usize>> = BTreeMap::new();
         let initial_state: usize = 0;
-        let last_state: usize = 0;
+        let states: Vec<usize> = Default::default();
         let final_states: BTreeSet<usize> = BTreeSet::new();
 
         let mut nfa = SetNFA {
             alphabet,
             function,
             initial_state,
-            last_state,
+            states,
             final_states,
         };
 
@@ -82,24 +77,24 @@ impl SetNFA {
                         stack.push(nfa.add_symbol_subgraph(*byte));
                         continue;
                     } else {
-                        stack.push(nfa.add_symbol_subgraph('\\' as u8));
+                        stack.push(nfa.add_symbol_subgraph(b'\\'));
                     }
                 }
                 match byte {
-                    92 => escape_char = true,
-                    42 => {
+                    b'\\' => escape_char = true,
+                    b'*' => {
                         let sub_nfa = stack.pop().unwrap();
                         stack.push(nfa.add_kleene_star_subgraph(sub_nfa));
                     }
-                    43 => {
+                    b'+' => {
                         let sub_nfa = stack.pop().unwrap();
                         stack.push(nfa.add_kleene_plus_subgraph(sub_nfa));
                     }
-                    63 => {
+                    b'?' => {
                         let sub_nfa = stack.pop().unwrap();
                         stack.push(nfa.add_optional_subgraph(sub_nfa));
                     }
-                    124 => {
+                    b'|' => {
                         let right_sub_nfa = stack.pop().unwrap();
                         let left_sub_nfa = stack.pop().unwrap();
                         stack.push(nfa.add_union_subgraph(left_sub_nfa, right_sub_nfa));
@@ -121,38 +116,37 @@ impl SetNFA {
                     _ => stack.push(nfa.add_symbol_subgraph(*byte)),
                 }
             }
-            final_states.push(nfa.last_state);
+            // FIXME: Better way to han
+            final_states.push(nfa.states().last().unwrap().to_owned());
             debug_assert!(!escape_char);
-            // For the case where the regex was empty.
-            if !stack.is_empty() {
-                let (final_start, final_end) = stack.pop().unwrap();
-                if let Some(to) = nfa.function.get_mut(&(initial_state, None)) {
-                    to.insert(final_start);
-                } else {
-                    nfa.function.insert(
-                        (initial_state, None),
-                        [final_start].iter().cloned().collect(),
-                    );
-                }
 
-                nfa.final_states.insert(final_end);
+            // Add regex NFA to final NFA.
+            assert!(!stack.is_empty());
+            let (regex_start, regex_end) = stack.pop().unwrap();
+            match nfa.function.entry((initial_state, None)) {
+                Entry::Occupied(mut entry) => entry.get_mut().push(regex_start),
+                Entry::Vacant(entry) => {
+                    entry.insert(vec![regex_start]);
+                }
             }
+            nfa.final_states.insert(regex_end);
         }
 
         (nfa, final_states)
     }
 
     fn add_state(&mut self) -> usize {
-        self.last_state += 1;
-        self.last_state
+        self.states.push(self.states.len());
+        self.states.last().unwrap().to_owned()
     }
 
     fn add_symbol_subgraph(&mut self, byte: u8) -> (usize, usize) {
-        self.alphabet.insert(byte);
+        if !self.alphabet.contains(&byte) {
+            self.alphabet.push(byte);
+        }
         let new_start = self.add_state();
         let new_end = self.add_state();
-        self.function
-            .insert((new_start, Some(byte)), [new_end].iter().cloned().collect());
+        self.function.insert((new_start, Some(byte)), vec![new_end]);
         (new_start, new_end)
     }
 
@@ -161,8 +155,7 @@ impl SetNFA {
         (start1, end1): (usize, usize),
         (start2, end2): (usize, usize),
     ) -> (usize, usize) {
-        self.function
-            .insert((end1, None), [start2].iter().cloned().collect());
+        self.function.insert((end1, None), vec![start2]);
         (start1, end2)
     }
 
@@ -173,85 +166,68 @@ impl SetNFA {
     ) -> (usize, usize) {
         let new_start = self.add_state();
         let new_end = self.add_state();
-        self.function.insert(
-            (new_start, None),
-            [start1, start2].iter().cloned().collect(),
-        );
         self.function
-            .insert((end1, None), [new_end].iter().cloned().collect());
-        self.function
-            .insert((end2, None), [new_end].iter().cloned().collect());
+            .insert((new_start, None), vec![start1, start2]);
+        self.function.insert((end1, None), vec![new_end]);
+        self.function.insert((end2, None), vec![new_end]);
         (new_start, new_end)
     }
 
     fn add_optional_subgraph(&mut self, (start, end): (usize, usize)) -> (usize, usize) {
         let new_start = self.add_state();
         let new_end = self.add_state();
-        self.function.insert(
-            (new_start, None),
-            [start, new_end].iter().cloned().collect(),
-        );
         self.function
-            .insert((end, None), [new_end].iter().cloned().collect());
+            .insert((new_start, None), vec![start, new_end]);
+        self.function.insert((end, None), vec![new_end]);
         (new_start, new_end)
     }
 
     fn add_kleene_star_subgraph(&mut self, (start, end): (usize, usize)) -> (usize, usize) {
         let new_start = self.add_state();
         let new_end = self.add_state();
-        self.function.insert(
-            (new_start, None),
-            [start, new_end].iter().cloned().collect(),
-        );
         self.function
-            .insert((end, None), [start, new_end].iter().cloned().collect());
+            .insert((new_start, None), vec![start, new_end]);
+        self.function.insert((end, None), vec![start, new_end]);
         (new_start, new_end)
     }
 
     fn add_kleene_plus_subgraph(&mut self, (start, end): (usize, usize)) -> (usize, usize) {
         let new_start = self.add_state();
         let new_end = self.add_state();
-        self.function
-            .insert((new_start, None), [start].iter().cloned().collect());
-        self.function
-            .insert((end, None), [start, new_end].iter().cloned().collect());
+        self.function.insert((new_start, None), vec![start]);
+        self.function.insert((end, None), vec![start, new_end]);
         (new_start, new_end)
     }
 }
 
-pub fn get_epsilon_closure(nfa: &impl NFA<usize>) -> BTreeMap<usize, Vec<usize>> {
-    let mut epsilon_closure: BTreeMap<usize, Vec<usize>> = BTreeMap::new();
-    let nfa_states: Vec<usize> = nfa.states().collect();
-    for &state in &nfa_states {
+pub fn get_epsilon_closure(nfa: &impl NFA<usize>) -> Vec<Vec<usize>> {
+    //let mut epsilon_closure: BTreeMap<usize, Vec<usize>> = BTreeMap::new();
+    let nfa_states_count = nfa.states().len();
+    let mut epsilon_closure: Vec<Vec<usize>> = vec![Default::default(); nfa_states_count];
+    //for &state in &nfa_states {
+    for (state, ref mut list) in epsilon_closure.iter_mut().enumerate() {
         let mut marked_states: BTreeMap<usize, bool> = BTreeMap::new();
 
         // Add current state as an unmarked state.
         marked_states.insert(state, false);
 
         // Main loop of the algorithm. On each iteraton, an unmarked state is selected.
-        while let Some(unmarked_state) = marked_states
-            .clone()
-            .into_iter()
-            .find(|(_, marked)| !marked)
-        {
-            // dbg!(unmarked_state);
+        while let Some(unmarked_state) = marked_states.iter().find(|(_, &marked)| !marked) {
             // Get and mark the selected state.
-            let (unmarked_state, _) = unmarked_state;
+            let (&unmarked_state, _) = unmarked_state;
             marked_states.insert(unmarked_state, true);
 
             // Add all states reachable with an epsilon transition as unmarked.
             if let Some(states_to_add) = nfa.next(unmarked_state, None) {
-                for state in states_to_add {
+                for &state in states_to_add {
                     // Make sure it is only inserted once.
                     marked_states.entry(state).or_insert(false);
                 }
             }
         }
         // Add all marked states to epsilon closure.
-        epsilon_closure.insert(
-            state,
-            marked_states.into_iter().map(|(state, _)| state).collect(),
-        );
+        let mut new_list = marked_states.into_iter().map(|(state, _)| state).collect();
+        list.append(&mut new_list);
     }
     epsilon_closure
 }

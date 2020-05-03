@@ -6,8 +6,8 @@ use alloc::collections::btree_set::BTreeSet;
 
 #[derive(Debug)]
 pub struct SetDFA {
-    pub states: BTreeSet<usize>,
-    pub alphabet: BTreeSet<u8>,
+    pub states: Vec<usize>,
+    pub alphabet: Vec<u8>,
     pub function: BTreeMap<(usize, u8), usize>,
     pub initial_state: usize,
     pub final_states: BTreeSet<usize>,
@@ -27,8 +27,8 @@ impl DFA<usize> for SetDFA {
         self.final_states.contains(&state)
     }
 
-    fn states(&self) -> Box<dyn Iterator<Item = usize>> {
-        Box::new(self.states.clone().into_iter())
+    fn states(&self) -> &[usize] {
+        &self.states
     }
 
     /// Return the next state based on a state and an input character.
@@ -36,8 +36,8 @@ impl DFA<usize> for SetDFA {
         self.function.get(&(state, input)).cloned()
     }
 
-    fn alphabet(&self) -> Box<dyn Iterator<Item = u8>> {
-        Box::new(self.alphabet.clone().into_iter())
+    fn alphabet(&self) -> &[u8] {
+        &self.alphabet
     }
 }
 
@@ -50,30 +50,29 @@ impl SetDFA {
     ///
     /// Since multiple NFA states correspond to a single DFA state, the NFA states will be sorted
     /// to make sure the comparisons are done properly.
-    pub fn from_nfa(nfa: impl NFA<usize>) -> (Self, BTreeMap<BTreeSet<usize>, usize>) {
-        let mut nfa_to_dfa_states_map: BTreeMap<Vec<usize>, usize> = BTreeMap::new();
-        let mut marked_states: BTreeMap<usize, bool> = BTreeMap::new();
+    pub fn from_nfa(nfa: impl NFA<usize>) -> (Self, Vec<Vec<usize>>) {
+        let mut nfa_to_dfa_states_map: Vec<Vec<usize>> = Default::default();
+        // Marked DFA states.
+        let mut marked_states: Vec<bool> = Default::default();
         let mut function: BTreeMap<(usize, u8), usize> = BTreeMap::new();
-        let alphabet = nfa.alphabet().collect();
+        let alphabet = nfa.alphabet().to_vec();
         let epsilon_closure = get_epsilon_closure(&nfa);
         //println!("##### EPSILON CLOSURE DONE");
 
         // Get the inital states of the nfa and set the corresponding DFA state to 0.
-        let mut initial_states = epsilon_closure[&nfa.initial_state()].clone();
+        let mut initial_states = epsilon_closure[nfa.initial_state()].clone();
         initial_states.sort_unstable();
         initial_states.dedup();
-        nfa_to_dfa_states_map.insert(initial_states, 0);
-        marked_states.insert(0, false);
+        nfa_to_dfa_states_map.push(initial_states);
+        marked_states.push(false);
 
+        //
         // Main loop of the algorithm. On each iteraton, an unmarked state is selected.
-        while let Some(unmarked_state) = nfa_to_dfa_states_map
-            .clone()
-            .into_iter()
-            .find(|(_, state)| !marked_states[state])
-        {
+        while let Some(unmarked_state_dfa) = marked_states.iter().position(|marked| !marked) {
             // Get and mark the selected state.
-            let (unmarked_states_nfa, unmarked_state_dfa) = unmarked_state;
-            marked_states.insert(unmarked_state_dfa, true);
+            // FIXME: It would be nice to get rid of this clone.
+            let unmarked_states_nfa = nfa_to_dfa_states_map[unmarked_state_dfa].clone();
+            marked_states[unmarked_state_dfa] = true;
 
             // Iterator over all symbol in the alphabet.
             for &current_symbol in &alphabet {
@@ -81,9 +80,10 @@ impl SetDFA {
                 let mut states: Vec<usize> = unmarked_states_nfa
                     .iter()
                     .filter_map(|&state| nfa.next(state, Some(current_symbol)))
-                    .map(|mut states| {
-                        //assert!(states.len() == 1);
-                        epsilon_closure[&states.next().unwrap()].clone()
+                    .map(|states| {
+                        // We know it has to be exactly one because of Thompson construction.
+                        assert!(states.len() == 1);
+                        epsilon_closure[states[0]].clone()
                     })
                     .flatten()
                     .collect();
@@ -91,15 +91,15 @@ impl SetDFA {
                 states.dedup();
 
                 // Check if the DFA state already exist.
-                let next_id = match nfa_to_dfa_states_map.get(&states) {
-                    // If so, return its id.
-                    Some(next_id) => *next_id,
-                    // If not, get a new id and add it.
+                let next_id = match nfa_to_dfa_states_map
+                    .iter()
+                    .position(|existing_states| *existing_states == states)
+                {
+                    Some(dfa_state) => dfa_state,
                     None => {
-                        let next_id = nfa_to_dfa_states_map.len();
-                        nfa_to_dfa_states_map.insert(states, next_id);
-                        marked_states.insert(next_id, false);
-                        next_id
+                        nfa_to_dfa_states_map.push(states);
+                        marked_states.push(false);
+                        marked_states.len() - 1
                     }
                 };
                 // Add to transition function.
@@ -109,8 +109,8 @@ impl SetDFA {
 
         // It is assumed that there is only one NFA final state for each DFA state.
         let mut final_states: BTreeSet<usize> = BTreeSet::new();
-        for current_states in nfa_to_dfa_states_map.keys() {
-            let final_states_count = current_states
+        for (dfa_state, nfa_states) in nfa_to_dfa_states_map.iter().enumerate() {
+            let final_states_count = nfa_states
                 .iter()
                 .filter(|&&state| nfa.is_final_state(state))
                 .count();
@@ -124,33 +124,21 @@ impl SetDFA {
 
             // If there is more than one final state, take the first.
             // FIXME: It works, but it is the last token that it kept which is weird.
-            if let Some(&state_id) = current_states
-                .iter()
-                .find(|&&state| nfa.is_final_state(state))
-            {
-                if nfa.is_final_state(state_id) {
-                    final_states.insert(nfa_to_dfa_states_map[current_states]);
-                }
+            // Still weird, it is not here that the token is decided... maybe in the map.
+            if nfa_states.iter().any(|&state| nfa.is_final_state(state)) {
+                final_states.insert(dfa_state);
             }
         }
 
         (
             SetDFA {
-                states: nfa_to_dfa_states_map.values().cloned().collect(),
+                states: (0..marked_states.len()).collect(),
                 alphabet,
                 function,
                 initial_state: 0,
                 final_states,
             },
-            nfa_to_dfa_states_map
-                .into_iter()
-                .map(|(nfa_states, dfa_state)| {
-                    (
-                        nfa_states.into_iter().collect::<BTreeSet<usize>>(),
-                        dfa_state,
-                    )
-                })
-                .collect(),
+            nfa_to_dfa_states_map,
         )
     }
 
@@ -159,7 +147,12 @@ impl SetDFA {
         let trap_states = get_trap_states(self);
         //assert!(trap_states.len() <= 1);
         for trap_state in trap_states {
-            self.states.remove(&trap_state);
+            let index = self
+                .states
+                .iter()
+                .position(|&state| state == trap_state)
+                .unwrap();
+            self.states.remove(index);
             for (pair, to) in self.function.clone() {
                 if to == trap_state {
                     self.function.remove(&pair);
@@ -172,8 +165,8 @@ impl SetDFA {
         dfa: &impl DFA<usize>,
         mutex_states_sets: &[BTreeSet<usize>],
     ) -> (Self, BTreeMap<BTreeSet<usize>, usize>) {
-        let alphabet: BTreeSet<u8> = dfa.alphabet().collect();
-        let old_states: Vec<usize> = dfa.states().collect();
+        let alphabet: Vec<u8> = dfa.alphabet().to_vec();
+        let old_states: Vec<usize> = dfa.states().to_vec();
         // Check if the mutex states sets intersect.
         for i in 0..mutex_states_sets.len() {
             for j in i + 1..mutex_states_sets.len() {
@@ -202,16 +195,6 @@ impl SetDFA {
         }
         // FIXME: I can probably use this to check for duplicates and thus, intersection.
         let mutex_states: BTreeSet<usize> = mutex_states_sets.iter().cloned().flatten().collect();
-        /*
-        let mutex_states: BTreeSet<usize> = {
-            let len = mutex_states.len();
-            let mutex_states: BTreeSet<usize> = mutex_states.into_iter().collect();
-            if len != mutex_states.len() {
-                panic!("Some state sets are no disjoint.");
-            }
-            mutex_states
-        };
-        */
         let (leftover_non_final_states, leftover_final_states): (BTreeSet<usize>, BTreeSet<usize>) =
             old_states
                 .iter()
@@ -242,21 +225,31 @@ impl SetDFA {
                         }
                     })
                     .collect();
-                let mut new_p: Vec<BTreeSet<usize>> = Default::default();
-                for y in p.into_iter() {
-                    let intersection: BTreeSet<usize> = x.intersection(&y).cloned().collect();
-                    let difference: BTreeSet<usize> = y.difference(&x).cloned().collect();
-                    if !intersection.is_empty() && !difference.is_empty() {
-                        new_p.push(intersection.clone());
-                        new_p.push(difference.clone());
+                // Compare each set of p with x.
+                let mut new_p: Vec<BTreeSet<usize>> = Vec::with_capacity(2 * p.len());
+                while let Some(y) = p.pop() {
+                    // Check right away is either the intersection or difference is empty to avoid
+                    // allocation.
+                    if !x.is_disjoint(&y) && y.difference(&x).next().is_some() {
+                        // Get the intersection and difference;
+                        let intersection: BTreeSet<usize> = x.intersection(&y).cloned().collect();
+                        let difference: BTreeSet<usize> = y.difference(&x).cloned().collect();
+                        // Check which if intersection is smaller.
+                        let intersection_smaller = intersection.len() <= difference.len();
+                        // Add to new p and cache their index.
+                        let intersection_index = new_p.len();
+                        new_p.push(intersection);
+                        let difference_index = new_p.len();
+                        new_p.push(difference);
+                        // If y is in w, replace it by both, otherwise, add the smallest.
                         if let Some(position) = w.iter().position(|set| *set == y) {
-                            w.remove(position);
-                            w.push(intersection);
-                            w.push(difference);
-                        } else if intersection.len() <= difference.len() {
-                            w.push(intersection);
+                            w.swap_remove(position);
+                            w.push(new_p[intersection_index].clone());
+                            w.push(new_p[difference_index].clone());
+                        } else if intersection_smaller {
+                            w.push(new_p[intersection_index].clone());
                         } else {
-                            w.push(difference);
+                            w.push(new_p[difference_index].clone());
                         }
                     } else {
                         new_p.push(y);
@@ -322,9 +315,10 @@ where
     T: core::cmp::Eq + core::marker::Copy,
 {
     dfa.states()
-        .filter(|&from| {
+        .iter()
+        .filter(|&&from| {
             !dfa.is_final_state(from)
-                && dfa.alphabet().all(|input| {
+                && dfa.alphabet().iter().all(|&input| {
                     if let Some(to) = dfa.next(from, input) {
                         from == to
                     } else {
@@ -332,6 +326,7 @@ where
                     }
                 })
         })
+        .cloned()
         .collect()
 }
 
@@ -342,7 +337,8 @@ where
     dfa.final_states()
         .filter(|&final_state| {
             dfa.alphabet()
-                .any(|input| dfa.next(final_state, input).is_some())
+                .iter()
+                .any(|&input| dfa.next(final_state, input).is_some())
         })
         .collect()
 }

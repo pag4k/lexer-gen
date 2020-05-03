@@ -20,8 +20,8 @@ impl DotGraph {
         //backtrack: &HashSet<usize>,
         //(first_state, last_state): (usize, usize),
     ) -> DotGraph {
-        let states: Vec<usize> = nfa.states().collect();
-        let alphabet: Vec<u8> = nfa.alphabet().collect();
+        let states: Vec<usize> = nfa.states().to_vec();
+        let alphabet: Vec<u8> = nfa.alphabet().to_vec();
 
         let mut dot_graph = DotGraph { code: Vec::new() };
         dot_graph.add_line("digraph finite_state_machine {");
@@ -101,8 +101,8 @@ impl DotGraph {
         final_states_to_token: &BTreeMap<usize, impl Display>,
         backtrack_states: &[usize],
     ) -> DotGraph {
-        let states: Vec<usize> = dfa.states().collect();
-        let alphabet: Vec<u8> = dfa.alphabet().collect();
+        let states: Vec<usize> = dfa.states().to_vec();
+        let alphabet: Vec<u8> = dfa.alphabet().to_vec();
 
         let mut dot_graph = DotGraph { code: Vec::new() };
         dot_graph.add_line("digraph finite_state_machine {");
@@ -180,15 +180,19 @@ impl DotGraph {
 
     pub fn from_dfa2(dfa: &dyn DFA<usize>) -> DotGraph {
         let mut dot_graph = DotGraph { code: Vec::new() };
-        let states: Vec<usize> = dfa.states().collect();
-        let alphabet: Vec<u8> = dfa.alphabet().collect();
+        let states: Vec<usize> = dfa.states().to_vec();
+        let alphabet: Vec<u8> = dfa.alphabet().to_vec();
         dot_graph.add_line("digraph finite_state_machine {");
         dot_graph.add_line("\trankdir=LR;");
         dot_graph.add_line("\tsize=\"8,5\"");
 
         dot_graph.add_line("");
 
-        for state in dfa.states().filter(|state| dfa.is_final_state(*state)) {
+        for state in dfa
+            .states()
+            .iter()
+            .filter(|&&state| dfa.is_final_state(state))
+        {
             let line = format!(
                 "\tnode [shape = rectangle, label=\"{} -> {}\", fontsize=12] token{};",
                 state, state, state
@@ -198,7 +202,7 @@ impl DotGraph {
 
         dot_graph.add_line("");
 
-        for state in dfa.states() {
+        for &state in dfa.states() {
             let node = if dfa.is_final_state(state) {
                 "doublecircle"
             } else {

@@ -26,11 +26,11 @@ pub fn regex<T: AsRef<[char]>>(input: T) -> Vec<char> {
 // FIXME: Assume there are no escape char in classes.
 fn replace_classes<T: AsRef<[char]>>(input: T) -> Vec<char> {
     let mut output = Vec::from(input.as_ref());
-    dbg!(&output);
+    //dbg!(&output);
     let mut last_position = 0;
     while let Some(left_position) = output.iter().skip(last_position).position(|&c| c == '[') {
         let left_position = last_position + left_position;
-        dbg!(&left_position);
+        //dbg!(&left_position);
         // FIXME: Probably a better way to handle this increase.
         last_position = left_position + 1;
         if left_position != 0 && output[left_position - 1] == '\\' {
@@ -38,7 +38,7 @@ fn replace_classes<T: AsRef<[char]>>(input: T) -> Vec<char> {
         }
         while let Some(right_position) = output.iter().skip(left_position).position(|&c| c == ']') {
             let right_position = left_position + right_position;
-            dbg!(&right_position);
+            //dbg!(&right_position);
             if right_position != 0 && output[right_position - 1] == '\\' {
                 continue;
             }
@@ -47,7 +47,7 @@ fn replace_classes<T: AsRef<[char]>>(input: T) -> Vec<char> {
             let negated = output[position] == '^';
             position += if negated { 1 } else { 0 };
             while position < right_position {
-                println!("Char {} at {}", output[position], position);
+                //println!("Char {} at {}", output[position], position);
 
                 let (start_char, end_char) = if position + 4 < right_position
                     && output[position] == '\\'
@@ -137,7 +137,7 @@ fn replace_classes<T: AsRef<[char]>>(input: T) -> Vec<char> {
             break;
         }
     }
-    dbg!(output.clone().into_iter().collect::<String>());
+    //dbg!(output.clone().into_iter().collect::<String>());
     output
 }
 
@@ -169,7 +169,7 @@ fn add_explicit_concat<T: AsRef<[char]>>(input: T) -> Vec<char> {
         }
     }
 
-    dbg!(new_regex.clone().into_iter().collect::<String>());
+    //dbg!(new_regex.clone().into_iter().collect::<String>());
     new_regex
 }
 
@@ -230,7 +230,7 @@ fn to_postfix<T: AsRef<[char]>>(input: T) -> Vec<char> {
     operator_stack.sort_by_cached_key(|a| OPERATORS.iter().find(|c| a == *c).unwrap());
     new_regex.append(&mut operator_stack);
 
-    dbg!(new_regex.clone().into_iter().collect::<String>());
+    //dbg!(new_regex.clone().into_iter().collect::<String>());
     new_regex
 }
 
